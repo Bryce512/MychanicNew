@@ -2546,7 +2546,7 @@ SPEC CHECKSUMS:
   ExpoKeepAwake: bf0811570c8da182bfb879169437d4de298376e7
   ExpoModulesCore: a77bac5c35f8d246e72d719856091d7e84fe797e
   EXUpdatesInterface: 7ff005b7af94ee63fa452ea7bb95d7a8ff40277a
-  fast_float: 06eeec4fe712a76acc9376682e4808b05ce978b6
+  fast_float: 05004cbe8eea9623ac8183836d66d469d220c9c2
   FBLazyVector: a62a7a5760929b6265e27bc01ab7598dde93ebd3
   Firebase: 735108d2d0b67827cd929bfe8254983907c4479f
   FirebaseAnalytics: 2979c21ead00c520feff30db97ebadd669442f2a
