@@ -14,21 +14,25 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bryce512.Mychanic"
+      "bundleIdentifier": "com.bryce512.Mychanic",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.bryce512.Mychanic",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "@react-native-firebase/app",
-      "@react-native-firebase/auth"
+      "@react-native-firebase/auth",
+      "react-native-ble-manager"
     ]
   }
 }

@@ -67,7 +67,9 @@ export default function VehicleProfilesScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View>
-            <Text style={[styles.title, isDark && styles.textLight]}>My Vehicles</Text>
+            <Text style={[styles.title, isDark && styles.textLight]}>
+              My Vehicles
+            </Text>
             <Text style={[styles.subtitle, isDark && styles.textMutedLight]}>
               Manage your vehicle profiles and view diagnostic data
             </Text>
@@ -95,35 +97,65 @@ export default function VehicleProfilesScreen() {
                   styles.vehicleCard,
                   selectedVehicle === index && styles.selectedVehicleCard,
                   isDark && styles.vehicleCardDark,
-                  selectedVehicle === index && isDark && styles.selectedVehicleCardDark,
+                  selectedVehicle === index &&
+                    isDark &&
+                    styles.selectedVehicleCardDark,
                 ]}
               >
                 <View style={styles.vehicleCardHeader}>
-                  <Text style={[styles.vehicleName, isDark && styles.textLight]}>{vehicle.name}</Text>
+                  <Text
+                    style={[styles.vehicleName, isDark && styles.textLight]}
+                  >
+                    {vehicle.name}
+                  </Text>
 
                   <View
                     style={[
                       styles.connectionBadge,
-                      vehicle.obd ? styles.connectedBadge : styles.notConnectedBadge,
+                      vehicle.obd
+                        ? styles.connectedBadge
+                        : styles.notConnectedBadge,
                       isDark && styles.connectionBadgeDark,
                     ]}
                   >
                     {vehicle.obd ? (
                       <View style={styles.badgeContent}>
-                        <Feather name="check-circle" size={12} color={colors.green[500]} />
+                        <Feather
+                          name="check-circle"
+                          size={12}
+                          color={colors.green[500]}
+                        />
                         <Text style={styles.connectedText}>Connected</Text>
                       </View>
                     ) : (
-                      <Text style={[styles.notConnectedText, isDark && styles.textMutedLight]}>Not Connected</Text>
+                      <Text
+                        style={[
+                          styles.notConnectedText,
+                          isDark && styles.textMutedLight,
+                        ]}
+                      >
+                        Not Connected
+                      </Text>
                     )}
                   </View>
                 </View>
 
-                <Image source={{ uri: vehicle.image }} style={styles.vehicleImage} resizeMode="contain" />
+                <Image
+                  source={{ uri: vehicle.image }}
+                  style={styles.vehicleImage}
+                  resizeMode="contain"
+                />
 
                 <View style={styles.vehicleStatus}>
                   <View style={styles.statusHeader}>
-                    <Text style={[styles.statusLabel, isDark && styles.textMutedLight]}>Health Status</Text>
+                    <Text
+                      style={[
+                        styles.statusLabel,
+                        isDark && styles.textMutedLight,
+                      ]}
+                    >
+                      Health Status
+                    </Text>
                     <Text
                       style={[
                         styles.statusValue,
@@ -134,7 +166,9 @@ export default function VehicleProfilesScreen() {
                             : vehicle.status === "Poor"
                               ? styles.statusPoor
                               : styles.statusUnknown,
-                        isDark && vehicle.status === "Unknown" && styles.textMutedLight,
+                        isDark &&
+                          vehicle.status === "Unknown" &&
+                          styles.textMutedLight,
                       ]}
                     >
                       {vehicle.status}
@@ -160,15 +194,33 @@ export default function VehicleProfilesScreen() {
                   <View style={styles.vehicleFooter}>
                     {vehicle.obd ? (
                       <View style={styles.syncInfo}>
-                        <Feather name="clock" size={12} color={isDark ? colors.gray[400] : colors.gray[500]} />
-                        <Text style={[styles.syncText, isDark && styles.textMutedLight]}>
+                        <Feather
+                          name="clock"
+                          size={12}
+                          color={isDark ? colors.gray[400] : colors.gray[500]}
+                        />
+                        <Text
+                          style={[
+                            styles.syncText,
+                            isDark && styles.textMutedLight,
+                          ]}
+                        >
                           Last sync: {vehicle.lastSync}
                         </Text>
                       </View>
                     ) : (
                       <View style={styles.syncInfo}>
-                        <Feather name="alert-triangle" size={12} color={isDark ? colors.gray[400] : colors.gray[500]} />
-                        <Text style={[styles.syncText, isDark && styles.textMutedLight]}>
+                        <Feather
+                          name="alert-triangle"
+                          size={12}
+                          color={isDark ? colors.gray[400] : colors.gray[500]}
+                        />
+                        <Text
+                          style={[
+                            styles.syncText,
+                            isDark && styles.textMutedLight,
+                          ]}
+                        >
                           Connect OBD-II for diagnostics
                         </Text>
                       </View>
@@ -176,8 +228,14 @@ export default function VehicleProfilesScreen() {
 
                     {vehicle.alerts > 0 && (
                       <View style={styles.alertInfo}>
-                        <Feather name="alert-triangle" size={12} color={colors.yellow[500]} />
-                        <Text style={styles.alertText}>{vehicle.alerts} alert</Text>
+                        <Feather
+                          name="alert-triangle"
+                          size={12}
+                          color={colors.yellow[500]}
+                        />
+                        <Text style={styles.alertText}>
+                          {vehicle.alerts} alert
+                        </Text>
                       </View>
                     )}
                   </View>
@@ -185,9 +243,22 @@ export default function VehicleProfilesScreen() {
               </TouchableOpacity>
             ))}
 
-            <TouchableOpacity style={[styles.addVehicleCard, isDark && styles.addVehicleCardDark]}>
-              <Feather name="plus-circle" size={40} color={isDark ? colors.gray[400] : colors.gray[500]} />
-              <Text style={[styles.addVehicleText, isDark && styles.textMutedLight]}>Add Vehicle</Text>
+            <TouchableOpacity
+              style={[
+                styles.addVehicleCard,
+                isDark && styles.addVehicleCardDark,
+              ]}
+            >
+              <Feather
+                name="plus-circle"
+                size={40}
+                color={isDark ? colors.gray[400] : colors.gray[500]}
+              />
+              <Text
+                style={[styles.addVehicleText, isDark && styles.textMutedLight]}
+              >
+                Add Vehicle
+              </Text>
             </TouchableOpacity>
           </ScrollView>
 
@@ -195,8 +266,15 @@ export default function VehicleProfilesScreen() {
           <Card style={styles.detailsCard}>
             <CardHeader style={styles.detailsCardHeader}>
               <View>
-                <Text style={[styles.detailsTitle, isDark && styles.textLight]}>{vehicles[selectedVehicle].name}</Text>
-                <Text style={[styles.detailsMileage, isDark && styles.textMutedLight]}>
+                <Text style={[styles.detailsTitle, isDark && styles.textLight]}>
+                  {vehicles[selectedVehicle].name}
+                </Text>
+                <Text
+                  style={[
+                    styles.detailsMileage,
+                    isDark && styles.textMutedLight,
+                  ]}
+                >
                   {vehicles[selectedVehicle].mileage.toLocaleString()} miles
                 </Text>
               </View>
@@ -208,14 +286,26 @@ export default function VehicleProfilesScreen() {
                     onPress={() => {}}
                     variant="outline"
                     size="sm"
-                    icon={<Feather name="refresh-cw" size={14} color={isDark ? colors.white : colors.primary[500]} />}
+                    icon={
+                      <Feather
+                        name="refresh-cw"
+                        size={14}
+                        color={isDark ? colors.white : colors.primary[500]}
+                      />
+                    }
                   />
                 ) : (
                   <Button
                     title="Connect OBD-II"
                     onPress={() => {}}
                     size="sm"
-                    icon={<Feather name="upload-cloud" size={14} color={colors.white} />}
+                    icon={
+                      <Feather
+                        name="upload-cloud"
+                        size={14}
+                        color={colors.white}
+                      />
+                    }
                   />
                 )}
               </View>
@@ -223,17 +313,41 @@ export default function VehicleProfilesScreen() {
 
             <CardContent style={styles.detailsCardContent}>
               {!vehicles[selectedVehicle].obd && (
-                <View style={[styles.alertCard, isDark && styles.alertCardDark]}>
-                  <Feather name="alert-triangle" size={20} color={colors.yellow[500]} />
+                <View
+                  style={[styles.alertCard, isDark && styles.alertCardDark]}
+                >
+                  <Feather
+                    name="alert-triangle"
+                    size={20}
+                    color={colors.yellow[500]}
+                  />
                   <View style={styles.alertCardContent}>
-                    <Text style={[styles.alertCardTitle, isDark && styles.textLight]}>
+                    <Text
+                      style={[
+                        styles.alertCardTitle,
+                        isDark && styles.textLight,
+                      ]}
+                    >
                       Connect OBD-II for Enhanced Features
                     </Text>
-                    <Text style={[styles.alertCardText, isDark && styles.textMutedLight]}>
-                      Connect your vehicle to an OBD-II scanner to unlock real-time diagnostics, predictive maintenance,
-                      and share data with mechanics for better service.
+                    <Text
+                      style={[
+                        styles.alertCardText,
+                        isDark && styles.textMutedLight,
+                      ]}
+                    >
+                      Connect your vehicle to an OBD-II scanner to unlock
+                      real-time diagnostics, predictive maintenance, and share
+                      data with mechanics for better service.
                     </Text>
-                    <Button title="Connect Now" onPress={() => {}} size="sm" style={styles.alertCardButton} />
+                    <Button
+                      title="Connect Now"
+                      onPress={() =>
+                        navigation.navigate('ScanDevices' as never)
+                      }
+                      size="sm"
+                      style={styles.alertCardButton}
+                    />
                   </View>
                 </View>
               )}
@@ -241,32 +355,74 @@ export default function VehicleProfilesScreen() {
               <View style={styles.infoCards}>
                 <Card style={styles.infoCard}>
                   <CardHeader style={styles.infoCardHeader}>
-                    <Text style={[styles.infoCardTitle, isDark && styles.textLight]}>Vehicle Information</Text>
+                    <Text
+                      style={[styles.infoCardTitle, isDark && styles.textLight]}
+                    >
+                      Vehicle Information
+                    </Text>
                   </CardHeader>
                   <CardContent>
                     <View style={styles.infoGrid}>
                       <View style={styles.infoRow}>
-                        <Text style={[styles.infoLabel, isDark && styles.textMutedLight]}>Year:</Text>
-                        <Text style={[styles.infoValue, isDark && styles.textLight]}>
+                        <Text
+                          style={[
+                            styles.infoLabel,
+                            isDark && styles.textMutedLight,
+                          ]}
+                        >
+                          Year:
+                        </Text>
+                        <Text
+                          style={[styles.infoValue, isDark && styles.textLight]}
+                        >
                           {selectedVehicle === 0 ? "2018" : "2015"}
                         </Text>
                       </View>
                       <View style={styles.infoRow}>
-                        <Text style={[styles.infoLabel, isDark && styles.textMutedLight]}>Make:</Text>
-                        <Text style={[styles.infoValue, isDark && styles.textLight]}>
+                        <Text
+                          style={[
+                            styles.infoLabel,
+                            isDark && styles.textMutedLight,
+                          ]}
+                        >
+                          Make:
+                        </Text>
+                        <Text
+                          style={[styles.infoValue, isDark && styles.textLight]}
+                        >
                           {selectedVehicle === 0 ? "Toyota" : "Honda"}
                         </Text>
                       </View>
                       <View style={styles.infoRow}>
-                        <Text style={[styles.infoLabel, isDark && styles.textMutedLight]}>Model:</Text>
-                        <Text style={[styles.infoValue, isDark && styles.textLight]}>
+                        <Text
+                          style={[
+                            styles.infoLabel,
+                            isDark && styles.textMutedLight,
+                          ]}
+                        >
+                          Model:
+                        </Text>
+                        <Text
+                          style={[styles.infoValue, isDark && styles.textLight]}
+                        >
                           {selectedVehicle === 0 ? "Camry" : "Civic"}
                         </Text>
                       </View>
                       <View style={styles.infoRow}>
-                        <Text style={[styles.infoLabel, isDark && styles.textMutedLight]}>Engine:</Text>
-                        <Text style={[styles.infoValue, isDark && styles.textLight]}>
-                          {selectedVehicle === 0 ? "2.5L 4-Cylinder" : "1.8L 4-Cylinder"}
+                        <Text
+                          style={[
+                            styles.infoLabel,
+                            isDark && styles.textMutedLight,
+                          ]}
+                        >
+                          Engine:
+                        </Text>
+                        <Text
+                          style={[styles.infoValue, isDark && styles.textLight]}
+                        >
+                          {selectedVehicle === 0
+                            ? "2.5L 4-Cylinder"
+                            : "1.8L 4-Cylinder"}
                         </Text>
                       </View>
                     </View>
@@ -275,27 +431,61 @@ export default function VehicleProfilesScreen() {
 
                 <Card style={styles.infoCard}>
                   <CardHeader style={styles.infoCardHeader}>
-                    <Text style={[styles.infoCardTitle, isDark && styles.textLight]}>Service Status</Text>
+                    <Text
+                      style={[styles.infoCardTitle, isDark && styles.textLight]}
+                    >
+                      Service Status
+                    </Text>
                   </CardHeader>
                   <CardContent>
                     <View style={styles.serviceInfo}>
                       <View style={styles.serviceItem}>
-                        <Text style={[styles.serviceLabel, isDark && styles.textMutedLight]}>Last Service</Text>
+                        <Text
+                          style={[
+                            styles.serviceLabel,
+                            isDark && styles.textMutedLight,
+                          ]}
+                        >
+                          Last Service
+                        </Text>
                         <View style={styles.serviceDetail}>
-                          <Feather name="clock" size={14} color={isDark ? colors.gray[400] : colors.gray[500]} />
-                          <Text style={[styles.serviceText, isDark && styles.textLight]}>
+                          <Feather
+                            name="clock"
+                            size={14}
+                            color={isDark ? colors.gray[400] : colors.gray[500]}
+                          />
+                          <Text
+                            style={[
+                              styles.serviceText,
+                              isDark && styles.textLight,
+                            ]}
+                          >
                             {vehicles[selectedVehicle].lastService}
                           </Text>
                         </View>
                       </View>
 
                       <View style={styles.serviceItem}>
-                        <Text style={[styles.serviceLabel, isDark && styles.textMutedLight]}>
+                        <Text
+                          style={[
+                            styles.serviceLabel,
+                            isDark && styles.textMutedLight,
+                          ]}
+                        >
                           Next Recommended Service
                         </Text>
                         <View style={styles.serviceDetail}>
-                          <Feather name="calendar" size={14} color={isDark ? colors.gray[400] : colors.gray[500]} />
-                          <Text style={[styles.serviceText, isDark && styles.textLight]}>
+                          <Feather
+                            name="calendar"
+                            size={14}
+                            color={isDark ? colors.gray[400] : colors.gray[500]}
+                          />
+                          <Text
+                            style={[
+                              styles.serviceText,
+                              isDark && styles.textLight,
+                            ]}
+                          >
                             {vehicles[selectedVehicle].nextService}
                           </Text>
                         </View>
@@ -305,7 +495,13 @@ export default function VehicleProfilesScreen() {
                         title="Schedule Service"
                         onPress={() => {}}
                         variant="outline"
-                        icon={<Feather name="tool" size={14} color={isDark ? colors.white : colors.primary[500]} />}
+                        icon={
+                          <Feather
+                            name="tool"
+                            size={14}
+                            color={isDark ? colors.white : colors.primary[500]}
+                          />
+                        }
                         style={styles.scheduleButton}
                       />
                     </View>
@@ -316,15 +512,45 @@ export default function VehicleProfilesScreen() {
               {vehicles[selectedVehicle].obd && (
                 <Card style={styles.diagnosticsCard}>
                   <CardHeader style={styles.diagnosticsCardHeader}>
-                    <Text style={[styles.diagnosticsTitle, isDark && styles.textLight]}>Diagnostic Summary</Text>
+                    <Text
+                      style={[
+                        styles.diagnosticsTitle,
+                        isDark && styles.textLight,
+                      ]}
+                    >
+                      Diagnostic Summary
+                    </Text>
                   </CardHeader>
                   <CardContent>
                     <View style={styles.diagnosticsGrid}>
-                      <TouchableOpacity style={[styles.diagnosticItem, isDark && styles.diagnosticItemDark]}>
-                        <Text style={[styles.diagnosticLabel, isDark && styles.textMutedLight]}>Engine</Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.diagnosticItem,
+                          isDark && styles.diagnosticItemDark,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.diagnosticLabel,
+                            isDark && styles.textMutedLight,
+                          ]}
+                        >
+                          Engine
+                        </Text>
                         <View style={styles.diagnosticValue}>
-                          <Feather name="zap" size={16} color={colors.green[500]} />
-                          <Text style={[styles.diagnosticText, isDark && styles.textLight]}>Good</Text>
+                          <Feather
+                            name="zap"
+                            size={16}
+                            color={colors.green[500]}
+                          />
+                          <Text
+                            style={[
+                              styles.diagnosticText,
+                              isDark && styles.textLight,
+                            ]}
+                          >
+                            Good
+                          </Text>
                           <Feather
                             name="chevron-right"
                             size={16}
@@ -333,11 +559,34 @@ export default function VehicleProfilesScreen() {
                         </View>
                       </TouchableOpacity>
 
-                      <TouchableOpacity style={[styles.diagnosticItem, isDark && styles.diagnosticItemDark]}>
-                        <Text style={[styles.diagnosticLabel, isDark && styles.textMutedLight]}>Oil Life</Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.diagnosticItem,
+                          isDark && styles.diagnosticItemDark,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.diagnosticLabel,
+                            isDark && styles.textMutedLight,
+                          ]}
+                        >
+                          Oil Life
+                        </Text>
                         <View style={styles.diagnosticValue}>
-                          <Feather name="droplet" size={16} color={colors.yellow[500]} />
-                          <Text style={[styles.diagnosticText, isDark && styles.textLight]}>42%</Text>
+                          <Feather
+                            name="droplet"
+                            size={16}
+                            color={colors.yellow[500]}
+                          />
+                          <Text
+                            style={[
+                              styles.diagnosticText,
+                              isDark && styles.textLight,
+                            ]}
+                          >
+                            42%
+                          </Text>
                           <Feather
                             name="chevron-right"
                             size={16}
@@ -346,11 +595,34 @@ export default function VehicleProfilesScreen() {
                         </View>
                       </TouchableOpacity>
 
-                      <TouchableOpacity style={[styles.diagnosticItem, isDark && styles.diagnosticItemDark]}>
-                        <Text style={[styles.diagnosticLabel, isDark && styles.textMutedLight]}>Battery</Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.diagnosticItem,
+                          isDark && styles.diagnosticItemDark,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.diagnosticLabel,
+                            isDark && styles.textMutedLight,
+                          ]}
+                        >
+                          Battery
+                        </Text>
                         <View style={styles.diagnosticValue}>
-                          <Feather name="battery" size={16} color={colors.green[500]} />
-                          <Text style={[styles.diagnosticText, isDark && styles.textLight]}>Good (12.6V)</Text>
+                          <Feather
+                            name="battery"
+                            size={16}
+                            color={colors.green[500]}
+                          />
+                          <Text
+                            style={[
+                              styles.diagnosticText,
+                              isDark && styles.textLight,
+                            ]}
+                          >
+                            Good (12.6V)
+                          </Text>
                           <Feather
                             name="chevron-right"
                             size={16}
@@ -359,11 +631,34 @@ export default function VehicleProfilesScreen() {
                         </View>
                       </TouchableOpacity>
 
-                      <TouchableOpacity style={[styles.diagnosticItem, isDark && styles.diagnosticItemDark]}>
-                        <Text style={[styles.diagnosticLabel, isDark && styles.textMutedLight]}>Brakes</Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.diagnosticItem,
+                          isDark && styles.diagnosticItemDark,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.diagnosticLabel,
+                            isDark && styles.textMutedLight,
+                          ]}
+                        >
+                          Brakes
+                        </Text>
                         <View style={styles.diagnosticValue}>
-                          <Feather name="alert-triangle" size={16} color={colors.yellow[500]} />
-                          <Text style={[styles.diagnosticText, isDark && styles.textLight]}>Fair (32%)</Text>
+                          <Feather
+                            name="alert-triangle"
+                            size={16}
+                            color={colors.yellow[500]}
+                          />
+                          <Text
+                            style={[
+                              styles.diagnosticText,
+                              isDark && styles.textLight,
+                            ]}
+                          >
+                            Fair (32%)
+                          </Text>
                           <Feather
                             name="chevron-right"
                             size={16}
@@ -377,7 +672,13 @@ export default function VehicleProfilesScreen() {
                       title="View Full Diagnostics"
                       onPress={() => handleViewDiagnosticDetails(navigation)}
                       style={styles.viewDetailsButton}
-                      icon={<Feather name="arrow-right" size={16} color={colors.white} />}
+                      icon={
+                        <Feather
+                          name="arrow-right"
+                          size={16}
+                          color={colors.white}
+                        />
+                      }
                     />
                   </CardContent>
                 </Card>
@@ -387,7 +688,7 @@ export default function VehicleProfilesScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
