@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import type { FirebaseAuthTypes } from "@react-native-firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import firebaseService from "../services/firebaseService";
 
 type AuthContextType = {
@@ -15,68 +16,89 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export default function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
+
+  // Load stored user data when app starts
   useEffect(() => {
-    try {
-      // Initialize Firebase first
-      firebaseService.initializeFirebase().then(() => {
-        // Check initial auth state
-        const currentUser = firebaseService.getCurrentUser();
-        if (currentUser) {
-          setUser(currentUser);
+    // Check for stored credentials on startup
+    const loadStoredUser = async () => {
+      try {
+        const storedUserData = await AsyncStorage.getItem("userData");
+        if (storedUserData) {
+          setUser(JSON.parse(storedUserData));
         }
+      } catch (error) {
+        console.error("Failed to load authentication state:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-        // Listen for auth state changes
-        const unsubscribe = firebaseService.onAuthChange((user) => {
-          setUser(user);
-          setIsLoading(false);
-        });
-
-        // Return cleanup function to React
-        return () => unsubscribe();
-      });
-    } catch (error) {
-      console.error("Auth setup error:", error);
-      setIsLoading(false);
-    }
+    loadStoredUser();
   }, []);
 
-  const handleSignIn = async (email: string, password: string) => {
-    const { user, error } = await firebaseService.signIn(email, password);
-    return { error };
+  const signIn = async (email: string, password: string) => {
+    try {
+      // Your existing sign in logic
+      const response = await firebaseService.signIn(email, password);
+
+      // If login successful, store user data
+      if (response.user && !response.error) {
+        await AsyncStorage.setItem("userData", JSON.stringify(response.user));
+        setUser(response.user);
+      }
+
+      return response;
+    } catch (error) {
+      return { error };
+    }
   };
 
-  const handleSignUp = async (email: string, password: string) => {
-    const { user, error } = await firebaseService.signUp(email, password);
-    return { error, user };
+  const signUp = async (email: string, password: string) => {
+    try {
+      // Your existing sign up logic
+      const response = await firebaseService.signUp(email, password);
+
+      // If signup successful, store user data
+      if (response.user && !response.error) {
+        await AsyncStorage.setItem("userData", JSON.stringify(response.user));
+        setUser(response.user);
+        return { user: response.user, error: null };
+      }
+
+      // If signup failed, ensure both user and error are present
+      return { user: null, error: response.error ?? "Unknown error" };
+    } catch (error) {
+      return { user: null, error };
+    }
   };
 
-  const handleSignOut = async () => {
-    await firebaseService.signOut();
+  const signOut = async () => {
+    try {
+      // Your existing sign out logic
+      await firebaseService.signOut();
+
+      // Clear stored user data
+      await AsyncStorage.removeItem("userData");
+      setUser(null);
+    } catch (error) {
+      console.error("Sign out error:", error);
+    }
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        signIn: handleSignIn,
-        signUp: handleSignUp,
-        signOut: handleSignOut,
-      }}
-    >
+    <AuthContext.Provider value={{ user, isLoading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
-}
+};

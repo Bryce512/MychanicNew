@@ -8,6 +8,8 @@ import { ThemeProvider } from './app/components/theme-provider';
 import firebaseService from './app/services/firebaseService';
 import { View, Text } from 'react-native';
 import HomeScreen from './app/screens/Home';
+import SignupScreen from './app/screens/Signup';
+import AppNavigator from './app/navigation/AppNavigator';
 
 const Stack = createNativeStackNavigator();
 
@@ -57,10 +59,12 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <NavigationContainer>
-          <Stack.Navigator initialRouteName="Login">
+          {/* <Stack.Navigator initialRouteName="Login">
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
-          </Stack.Navigator>
+            <Stack.Screen name="Signup" component={SignupScreen} options={{ headerShown: false }} />
+          </Stack.Navigator> */}
+          <AppNavigator/>
         </NavigationContainer>
       </AuthProvider>
     </ThemeProvider>
