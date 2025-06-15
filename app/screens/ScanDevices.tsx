@@ -1,299 +1,620 @@
 /* eslint-disable no-bitwise */
-import React, { useState, useEffect } from 'react';
-// import { NodeJS } from 'node';
-import { View, Button, Text, Image, StyleSheet, ScrollView } from 'react-native';
-import {pidCommands}from '../services/pidCommands';
-import {useBleConnection} from '../services/bleConnections';
-import { useNavigation } from '@react-navigation/native';
-
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Platform,
+  Alert,
+  PermissionsAndroid,
+} from "react-native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import {
+  Text,
+  Card,
+  Button,
+  IconButton,
+  Divider,
+  List,
+  Surface,
+  useTheme,
+} from "react-native-paper";
+import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import { pidCommands } from "../services/pidCommands";
+import BluetoothDeviceSelector from "../components/BluetoothDeviceSelector";
+import { useBluetooth } from '../context/BluetoothContext';
+import BleManager from 'react-native-ble-manager';
 
 const ScanDevicesScreen = () => {
+  const theme = useTheme();
   const navigation = useNavigation();
-  const { isScanning, isConnected, device,  logMessage, handleScanAndConnect, sendCommand, handleDisconnect } = useBleConnection();
-  const {getCurrentVoltage,
-         getEngineRPM,
-  } = pidCommands();
-  const [log, setLog] = useState([]);
-  const [voltage, setVoltage] = useState<string | null>(null);
-  const [RPM, setRPM] = useState<string | null>(null);
- 
+  const {
+    voltage,
+    isScanning,
+    isConnected,
+    deviceId,
+    deviceName,
+    discoveredDevices,
+    setDiscoveredDevices,
+    showDeviceSelector,
+    setShowDeviceSelector,
+    startScan,
+    sendCommand,
+    connectToDevice,
+    disconnectDevice,
+    robustReconnect,
+    showAllDevices,
+    verifyConnection, // Add this to your context exports
+    rememberedDevice, // Get this from context instead of local state
+    connectToRememberedDevice, // Add this to your context exports
+    fetchVoltage
+  } = useBluetooth();
 
-// const writableUUID = '0000fff2-0000-1000-8000-00805f9b34fb'; // Correct writable UUID
-// const readableUUID = '0000fff1-0000-1000-8000-00805f9b34fb'; // Correct readable UUID
-// const serviceUUID = '0000fff0-0000-1000-8000-00805f9b34fb'; // Correct service UUID
+  const { getCurrentVoltage, getEngineRPM } = pidCommands();
+  const [rpm, setRpm] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
 
-const fetchData = async () => {
-  logMessage('Fetching data...');
-  await fetchVoltage();
-  await fetchEngineRPM();
-};
+  // Check connection status whenever the screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log("ScanDevicesScreen focused");
+      console.log("Connection status:", isConnected ? "Connected" : "Disconnected");
+      console.log("Device name:", deviceName);
+      
+      // If we have a remembered device but aren't connected, try connecting
+      if (rememberedDevice && !isConnected) {
+        console.log("Attempting auto-connection to remembered device");
+        connectToRememberedDevice();
+      }
+      
+      return () => {
+        // Optional cleanup when screen loses focus
+      };
+    }, [isConnected, rememberedDevice])
+  );
 
-const fetchVoltage = async () => {
-  try {
-    if (!device) {
-      console.error("Device is null. Cannot send command.");
+  // Verify connection when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      // Verify connection when screen is focused
+      const checkConnection = async () => {
+        console.log("ScanDevicesScreen focused, verifying connection...");
+        
+        if (isConnected && deviceId) {
+          const stillConnected = await verifyConnection(deviceId);
+          
+          if (!stillConnected) {
+            console.log("Connection lost during navigation, reconnecting...");
+            if (rememberedDevice) {
+              await connectToRememberedDevice();
+            }
+          } else {
+            console.log("Connection verified after navigation");
+          }
+        }
+      };
+      
+      checkConnection();
+      
+      return () => {
+        // Cleanup if needed when screen loses focus
+        console.log("ScanDevicesScreen unfocused");
+      };
+    }, [isConnected, deviceId])
+  );
+
+  // Fetch data from OBD-II device
+  const fetchData = async () => {
+    if (!isConnected) {
       return;
     }
-    const voltageResponse = await sendCommand(device, "AT RV");
 
-    // Ensure it's a valid voltage response before updating state
-    if (voltageResponse.match(/^\d+\.\d+V$/)) {
-      setVoltage(voltageResponse);
-    } else {
-      console.warn("Invalid voltage response:", voltageResponse);
+    setRefreshing(true);
+
+    try {
+      // await fetchVoltage();
+      // await fetchEngineRPM();
+    } catch (error) {
+      console.error(
+        `Error fetching data: ${
+          error && typeof error === "object" && "message" in error
+            ? (error as { message: string }).message
+            : JSON.stringify(error)
+        }`
+      );
+    } finally {
+      setRefreshing(false);
     }
-  } catch (error) {
-    console.error("Error fetching voltage:", error);
-  }
-};
-const fetchEngineRPM = async () => {
-  if (!device) {
-    console.error("Device is null. Cannot send command.");
-    return;
-  }
-  try {
-    await new Promise<void>((resolve) => setTimeout(() => resolve(), 500)); // Delay for stability
-    const rpmResponse = await sendCommand(device, "010C");
+  };
 
-    // Ensure it's a valid RPM response before updating state
-    if (rpmResponse.match(/^\d+$/)) {
-      setRPM(rpmResponse);
-    } else {
-      console.warn("Invalid RPM response:", rpmResponse);
+
+  // Check Bluetooth status before scanning
+  const checkBluetoothAndStartScan = async () => {
+    try {
+      // On Android, check Bluetooth status
+      if (Platform.OS === "android") {
+        try {
+          const isEnabled = await BleManager.checkState();
+          if (isEnabled !== "on") {
+            Alert.alert(
+              "Bluetooth Disabled",
+              "Please enable Bluetooth to scan for devices.",
+              [
+                {
+                  text: "Cancel",
+                  style: "cancel",
+                },
+                {
+                  text: "Settings",
+                  onPress: () => {
+                    // Open Bluetooth settings
+                    BleManager.enableBluetooth()
+                      .then(() => {
+                        setTimeout(() => startScan(), 1000);
+                      })
+                      .catch((err) => {
+                        console.error(
+                          `Failed to enable Bluetooth: ${err.message}`
+                        );
+                      });
+                  },
+                },
+              ]
+            );
+            return;
+          }
+        } catch (error) {
+          if (error && typeof error === "object" && "message" in error) {
+            console.error(`Error checking Bluetooth state: ${(error as { message: string }).message}`);
+          } else {
+            console.error(`Error checking Bluetooth state: ${JSON.stringify(error)}`);
+          }
+        }
+      }
+
+      // If we get here, Bluetooth should be on
+      startScan();
+    } catch (error) {
+      if (error && typeof error === "object" && "message" in error) {
+        console.error(`Error checking Bluetooth: ${(error as { message: string }).message}`);
+      } else {
+        console.error(`Error checking Bluetooth: ${JSON.stringify(error)}`);
+      }
     }
-  } catch (error) {
-    console.error("Error fetching RPM:", error);
-  }
-};
+  };
 
+  // Check permissions on component mount
+  useEffect(() => {
+    const checkPermissions = async () => {
+      if (Platform.OS === "android") {
+        const bluetoothScan = await PermissionsAndroid.check("android.permission.BLUETOOTH_SCAN");
+        const bluetoothConnect = await PermissionsAndroid.check("android.permission.BLUETOOTH_CONNECT");
+        const fineLocation = await PermissionsAndroid.check("android.permission.ACCESS_FINE_LOCATION");
 
+        console.log(
+          `BLUETOOTH_SCAN permission: ${bluetoothScan}`
+        );
+        console.log(
+          `BLUETOOTH_CONNECT permission: ${bluetoothConnect}`
+        );
+        console.log(
+          `LOCATION permission: ${fineLocation}`
+        );
+      }
+    };
 
-// `useEffect` to run both fetch functions continuously when connected
+    checkPermissions();
+    
+    // Try to connect to saved device when component mounts
+    if (rememberedDevice && !isConnected) {
+      console.log(`Found remembered device on mount: ${rememberedDevice.name}`);
+      connectToRememberedDevice();
+    }
+  }, []); // Empty dependency array means this runs once on mount
+
+  // Add this useEffect to auto-fetch voltage on connection
   // useEffect(() => {
-  //   let intervalId: any; // Use `any` for interval ID
-
-  //   if (isConnected) {
-  //     // Start polling both functions every 3 seconds (or whatever interval you prefer)
-  //     intervalId = setInterval(() => {
+  //   if (isConnected && deviceId) {
+  //     // Small delay to ensure connection is stable
+  //     const timer = setTimeout(() => {
+  //       console.log("Auto-fetching voltage after connection");
   //       fetchVoltage();
-  //       fetchEngineRPM();
-  //     }, 3000);
+  //     }, 1500);
+      
+  //     return () => clearTimeout(timer);
   //   }
-
-  //   // Cleanup on component unmount or when `isConnected` changes
-  //   return () => {
-  //     if (intervalId) {
-  //       clearInterval(intervalId); // Using the standard `clearInterval` without needing NodeJS.Timeout
-  //     }
-  //   };
-  // }, [isConnected]); // Runs when `isConnected` changes
+  // }, [isConnected, deviceId]);
 
   return (
-    <View style={styles.container}>
-      <ScrollView>
-        <Button title='blank'></Button>
-        <Button
-          title="Back"
-          // color="#841584"
-          onPress={() => {navigation.goBack()}}
+    <SafeAreaView style={styles.container}>
+      <Surface style={styles.header}>
+        <IconButton
+          icon="arrow-left"
+          size={24}
+          onPress={() => navigation.goBack()}
         />
-        <Button
-          title={isScanning ? "Scanning..." : "Start Scan"}
-          onPress={handleScanAndConnect}
-          disabled={isScanning || isConnected}
-        />
-        <Button
-          title="Disconnect"
-          onPress={handleDisconnect}
-          disabled={!isConnected}
-        />
-        <Button title="Get Voltage" onPress={fetchData} disabled={!isConnected} />
-        <Button
-          title="Get Engine RPM"
-          onPress={fetchEngineRPM}
-          disabled={!isConnected}
-        />
-      </ScrollView>
-      
-      <ScrollView style={styles.scrollView}>
-        <Text style={styles.logTitle}>Current Voltage: {voltage}</Text>
-        <Text></Text>
-        <Text style={styles.logTitle}>Current RPM: {RPM}</Text>
-        <Text>hey! L-A-N-E-Y</Text>
-      </ScrollView>
-    </View>
+        <Text variant="headlineMedium">OBD-II Scanner</Text>
+      </Surface>
+
+      <Card style={styles.connectionCard}>
+        <Card.Content>
+          <View style={styles.connectionStatusRow}>
+            <MaterialCommunityIcons
+              name={isConnected ? "bluetooth-connect" : "bluetooth"}
+              size={32}
+              color={isConnected ? theme.colors.primary : "#888"}
+            />
+            <View style={styles.connectionTextContainer}>
+              <Text variant="titleMedium">
+                {isConnected ? "Connected" : "Not Connected"}
+              </Text>
+              {deviceName && (
+                <Text variant="bodyMedium" style={styles.deviceName}>
+                  {deviceName}
+                </Text>
+              )}
+            </View>
+          </View>
+
+          <Divider style={styles.divider} />
+
+          <View style={styles.buttonGrid}>
+            {!isConnected ? (
+              <Button
+                mode="contained"
+                onPress={checkBluetoothAndStartScan}
+                disabled={isScanning}
+                icon={({ size, color }) => (
+                  <MaterialCommunityIcons
+                    name="bluetooth"
+                    size={size}
+                    color={color}
+                  />
+                )}
+                style={styles.actionButton}
+              >
+                {isScanning ? "Scanning..." : "Scan for Devices"}
+              </Button>
+            ) : (
+              <>
+                <Button
+                  mode="contained"
+                  onPress={fetchData}
+                  loading={refreshing}
+                  icon={({ size, color }) => (
+                    <MaterialCommunityIcons
+                      name="refresh"
+                      size={size}
+                      color={color}
+                    />
+                  )}
+                  style={styles.actionButton}
+                >
+                  {refreshing ? "Reading..." : "Read Data"}
+                </Button>
+                <Button
+                  mode="outlined"
+                  onPress={disconnectDevice}
+                  icon={({ size, color }) => (
+                    <MaterialCommunityIcons
+                      name="bluetooth-off"
+                      size={size}
+                      color={color}
+                    />
+                  )}
+                  style={styles.actionButton}
+                >
+                  Disconnect
+                </Button>
+              </>
+            )}
+          </View>
+        </Card.Content>
+      </Card>
+
+      {isConnected && (
+        <Card style={styles.dataCard}>
+          <Card.Title title="Vehicle Data" />
+          <Divider />
+          <Card.Content>
+            <List.Item
+              title="Battery Voltage"
+              description={voltage || "Not available"}
+              left={(props) => <List.Icon {...props} icon="car-battery" />}
+            />
+            <Divider style={styles.itemDivider} />
+            <List.Item
+              title="Engine RPM"
+              description={rpm || "Not available"}
+              left={(props) => <List.Icon {...props} icon="engine" />}
+            />
+          </Card.Content>
+        </Card>
+      )}
+
+      {isConnected && (
+        <Card style={styles.dataCard}>
+          <Card.Title title="Battery Voltage" />
+          <Card.Content>
+            <View style={styles.dataRow}>
+              <MaterialCommunityIcons
+                name="battery"
+                size={24}
+                color={theme.colors.primary}
+              />
+              <Text style={styles.dataValue}>
+                {refreshing ? (
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
+                ) : (
+                  voltage + "V" || "N/A"
+                )}
+              </Text>
+            </View>
+            
+            <Button
+              mode="contained"
+              onPress={fetchVoltage}
+              loading={refreshing}
+              style={{ marginTop: 10 }}
+            >
+              Refresh Voltage
+            </Button>
+          </Card.Content>
+        </Card>
+      )}
+
+      {/* Import the device selector component */}
+      <BluetoothDeviceSelector
+        visible={showDeviceSelector}
+        onClose={() => setShowDeviceSelector(false)}
+        devices={discoveredDevices}
+        onSelectDevice={connectToDevice}
+        isScanning={isScanning}
+        onScanAgain={startScan}
+      />
+
+
+
+      {/* Connection Status button */}
+      <TouchableOpacity
+        style={[styles.debugButtonContainer, { bottom: 220 }]}
+        onPress={() => {
+          console.log("Connection Status:", isConnected ? "Connected" : "Disconnected");
+          console.log("Device ID:", deviceId);
+          console.log("Device Name:", deviceName);
+          
+          // Try to connect if not already connected
+          if (!isConnected && rememberedDevice) {
+            console.log("Attempting reconnection...");
+            connectToRememberedDevice();
+          }
+        }}
+      >
+        <View style={styles.debugButton}>
+          <MaterialCommunityIcons name="information" size={20} color="#fff" />
+          <Text style={styles.debugButtonText}>Connection Status</Text>
+        </View>
+      </TouchableOpacity>
+
+      {/* Test OBD Command button */}
+      <TouchableOpacity
+        style={[styles.debugButton, { marginTop: 10 }]}
+        onPress={async () => {
+          if (!isConnected) {
+            Alert.alert("Not Connected", "Please connect to a device first");
+            return;
+          }
+          
+          try {
+            // Show a prompt to enter an OBD command
+            Alert.prompt(
+              "Test OBD Command",
+              "Enter an OBD command (e.g., AT RV, 0100, etc.)",
+              [
+                {
+                  text: "Cancel",
+                  style: "cancel"
+                },
+                {
+                  text: "Send",
+                  onPress: async (command) => {
+                    if (!command) return;
+                    
+                    try {
+                      const response = await sendCommand(command.trim(), "53fc0537-e506-0bcf-81ec-e757067e9ed3");
+                      Alert.alert("Response", `Command: ${command}\n\nResponse: ${response}`);
+                    } catch (err) {
+                      Alert.alert("Command Error", 
+                        `Error sending command: ${err instanceof Error ? err.message : String(err)}`);
+                    }
+                  }
+                }
+              ],
+              "plain-text",
+              "AT RV" // Default value
+            );
+          } catch (error) {
+            console.error("Error with test command:", error);
+          }
+        }}
+      >
+        <View style={styles.buttonContent}>
+          <MaterialCommunityIcons name="console" size={20} color="#fff" />
+          <Text style={styles.buttonText}>Test Command</Text>
+        </View>
+      </TouchableOpacity>
+
+
+      {/* Add diagnostic button to your UI */}
+      <TouchableOpacity
+        style={[styles.debugButtonContainer, { bottom: 630 }]}
+        onPress={async () => {
+          try {
+            if (isConnected && deviceId) {
+              Alert.alert(
+                "Reset Connection",
+                "This will disconnect and attempt to reconnect with proper service discovery.",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Reset Connection",
+                    onPress: async () => {
+                      
+                      // Disconnect
+                      await disconnectDevice();
+                      
+                      // Wait a moment
+                      await new Promise(resolve => setTimeout(resolve, 1000));
+                      
+                      // Reconnect with clean state
+                      if (rememberedDevice) {
+                        const success = await connectToRememberedDevice();
+                        if (success) {
+                          Alert.alert(
+                            "Reconnected",
+                            "Connection has been re-established with proper service discovery.",
+                            [{ text: "OK" }]
+                          );
+                        } else {
+                          Alert.alert(
+                            "Reconnection Failed",
+                            "Could not reconnect to the device. Try scanning again.",
+                            [{ text: "OK" }]
+                          );
+                        }
+                      }
+                    }
+                  }
+                ]
+              );
+            } else {
+              Alert.alert("Not Connected", "Device is not currently connected");
+            }
+          } catch (error) {
+            console.error("Error during reset:", error);
+          }
+        }}
+      >
+        <View style={styles.debugButton}>
+          <MaterialCommunityIcons name="restart" size={20} color="#fff" />
+          <Text style={styles.debugButtonText}>Reset Connection</Text>
+        </View>
+      </TouchableOpacity>
+
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
+    backgroundColor: "#f5f5f5",
   },
-  scrollView: {
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  connectionCard: {
+    margin: 16,
+    marginBottom: 8,
+    elevation: 2,
+  },
+  connectionStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  connectionTextContainer: {
+    marginLeft: 16,
+  },
+  deviceName: {
+    opacity: 0.7,
+  },
+  divider: {
+    marginVertical: 16,
+  },
+  itemDivider: {
+    height: 1,
+    opacity: 0.3,
+  },
+  buttonGrid: {
+    flexDirection: "row",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  actionButton: {
     flex: 1,
-    marginTop: 20,
-    width: '100%',
+    marginHorizontal: 4,
   },
-  logTitle: {
-    fontWeight: 'bold',
-    fontSize: 18,
-    marginBottom: 10,
+  dataCard: {
+    margin: 16,
+    marginBottom: 8,
+  },
+  logCard: {
+    margin: 16,
+    marginTop: 8,
+    flex: 1,
+    elevation: 2,
+  },
+  logScrollView: {
+    flex: 1,
+    maxHeight: 200,
   },
   logEntry: {
-    fontSize: 14,
-    marginBottom: 5,
+    fontSize: 13,
+    fontFamily: "monospace",
+    marginBottom: 4,
   },
-    image: {
-    width: 200,
-    height: 200,
-    resizeMode: 'contain', // or 'cover', 'stretch', 'repeat', 'center'
+  emptyLogText: {
+    fontStyle: "italic",
+    opacity: 0.7,
+    textAlign: "center",
+    paddingVertical: 20,
+  },
+  debugButton: {
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    backgroundColor: "#333",
+    padding: 8,
+    borderRadius: 8,
+    opacity: 0.8,
+  },
+  debugButtonText: {
+    color: "white",
+    fontSize: 12,
+  },
+  debugButtonContainer: {
+    position: "absolute",
+    bottom: 80,
+    right: 20,
+    alignItems: "center",
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "white",
+    marginLeft: 4,
+  },
+  dataRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  dataValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginLeft: 12,
   },
 });
 
 export default ScanDevicesScreen;
-
-
-
-
-// const logMessage = (message) => {
-  //   setLog((prevLog) => [...prevLog, message]);
-  //   console.log(message); // Log to console
-  // };
-  
-  // const handleScanAndConnect = async () => {
-  //   setIsScanning(true);
-  //   setLog([]);
-  //   logMessage('Starting scan...');
-  
-  //   btManager.startDeviceScan(null, null, async (error, discoveredDevice) => {
-  //     if (error) {
-  //       logMessage(`Scan error: ${error.message}`);
-  //       setIsScanning(false);
-  //       return;
-  //     }
-  
-  //     if (discoveredDevice.name === 'OBDII') {
-  //       logMessage(`Found OBDII device: ${discoveredDevice.name}`);
-  //       btManager.stopDeviceScan();
-  
-  //       try {
-  //         const connectedDevice = await discoveredDevice.connect({ autoConnect: true });
-  //         setIsConnected(true);
-  //         // setDevice(connectedDevice);
-  //         device = connectedDevice;
-  //         console.log('device:', device);
-  //         logMessage('Connected to OBDII device');
-  
-  //         await discoverServicesAndCharacteristics(connectedDevice);
-  //       } catch (err) {
-  //         logMessage(`Connection failed: ${err.message}`);
-  //       } finally {
-  //         setIsScanning(false);
-  //       }
-  //     }
-  //   });
-  // };
-  
-  // const discoverServicesAndCharacteristics = async (connectedDevice) => {
-  //   try {
-  //     await connectedDevice.discoverAllServicesAndCharacteristics();
-  //     const services = await connectedDevice.services();
-  
-  //     // for (const service of services) {
-  //     //   logMessage(`Service: ${service.uuid}`);
-  //     //   const characteristics = await connectedDevice.characteristicsForService(service.uuid);
-  
-  //     //   for (const characteristic of characteristics) {
-  //     //     logMessage(`  Characteristic: ${characteristic.uuid}`);
-  //     //     logMessage(`    Writable with response: ${characteristic.isWritableWithResponse}`);
-  //     //     logMessage(`    Readable: ${characteristic.isReadable}`);
-  //     //     logMessage(`    Notifiable: ${characteristic.isNotifiable}`);
-  //     //   }
-  //     // }
-  //   } catch (err) {
-  //     logMessage(`Error discovering services and characteristics: ${err.message}`);
-  //   }
-  // };
-  
-  // const handleVoltageResponse = (response) => {
-  //   console.log('Response:', response);
-  
-  //   // Remove unnecessary characters (e.g., \r, \n, >) but keep valid voltage characters
-  //   const cleanedResponse = response.replace(/[^0-9.]/g, ''); // Remove everything except digits and the decimal point
-  //   console.log('Cleaned Response:', cleanedResponse);
-  
-  //   // Match a floating-point number pattern
-  //   const voltageMatch = cleanedResponse.match(/(\d+\.\d+)/); // Match numbers like 9.1
-  
-  //   if (voltageMatch) {
-  //     return parseFloat(voltageMatch[1]); // Return the numerical voltage
-  //   }
-  
-  //   return null; // Return null if no voltage pattern is found
-  // };
-  
-  
-  // const onVoltageUpdate = async (
-  //   error: BleError | null,
-  //   characteristic: Characteristic | null
-  // ) => {
-  //   if (error) {
-  //     console.log(error);
-  //     return;
-  //   }
-  
-  //   if (characteristic?.value) {
-  //     console.log("Raw Data Received (Base64):", characteristic.value); // Log raw base64 data
-  
-  //     try {
-  //       const decodedData = base64.decode(characteristic.value); // Decode base64 data
-  //       console.log("Decoded Raw Data (String):", decodedData);
-  
-  //       // Log decoded data as bytes for additional debugging
-  //       const byteArray = Array.from(Buffer.from(decodedData, 'utf8'));
-  //       console.log("Decoded Raw Data (Bytes):", byteArray);
-  
-  //       // Extract and set the voltage
-  //       const extractedVoltage = handleVoltageResponse(decodedData);
-  //       if (extractedVoltage !== null) {
-  //         setVoltage(extractedVoltage);
-  //       } else {
-  //         console.log("No valid voltage found in response");
-  //       }
-  //     } catch (decodeError) {
-  //       console.error("Error decoding base64 data:", decodeError);
-  //     }
-  
-  //     return;
-  //   }
-  // };
-  
-  
-  // const testOBDIICommunication = async () => {
-  //   const command = Buffer.from('AT RV\r', 'utf8'); // Command to read voltage, encoded as UTF-8
-  
-  //   try {
-  //     await device.writeCharacteristicWithResponseForService(serviceUUID, writableUUID, command.toString('base64'));
-  //     console.log('Command sent:', 'AT RV');
-  
-  //     await device.monitorCharacteristicForService(serviceUUID, readableUUID, onVoltageUpdate);
-  
-  //   } catch (error) {
-  //     console.error('Error communicating with OBDII device:', error.message);
-  //   }
-  // };
-  
-  // const handleDisconnect = async () => {
-  //   try {
-  //     if (device) {
-  //       await device.cancelConnection();
-  //     }
-  //     setIsConnected(false);
-  //     logMessage('Disconnected from device.');
-  //   } catch (error) {
-  //     logMessage(`Failed to disconnect: ${error.message}`);
-  //   }
-  // };
