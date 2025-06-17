@@ -1,26 +1,27 @@
-'use client'
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { createNativeStackNavigator } from '@react-navigation/native-stack'
-import { useColorScheme } from 'react-native'
-import { Feather } from '@expo/vector-icons'
-import { useAuth } from '../contexts/AuthContext'
+"use client";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useColorScheme } from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { useAuth } from "../contexts/AuthContext";
 
 // Screens
-import HomeScreen from '../screens/Home'
-import FindMechanicsScreen from '../screens/FindMechanics'
+import HomeScreen from "../screens/Home";
+import FindMechanicsScreen from "../screens/FindMechanics";
 // import MechanicProfileScreen from '../screens/MechanicProfile'
 // import AppointmentsScreen from '../screens/Appointment'
-import VehicleProfilesScreen from '../screens/VehicleProfiles'
+import VehicleProfilesScreen from "../screens/VehicleProfiles";
 // // import VehicleDetailScreen from '../screens/VehicleDetailScreen'
-import BookAppointmentScreen from '../screens/BookAppointment'
-import LoginScreen from '../screens/Login'
-import SignupScreen from '../screens/Signup'
+import BookAppointmentScreen from "../screens/BookAppointment";
+import LoginScreen from "../screens/Login";
+import SignupScreen from "../screens/Signup";
 // import DriverOnboardingScreen from '../screens/driverOnBoarding'
 // import MechanicSignupScreen from '../screens/MechanicSignUp'
 // import MechanicDashboardScreen from '../screens/MechanicDashboard'
-import DiagnosticsDetailScreen from '../screens/dtcDetails';
-import ScanDevicesScreen from '../screens/ScanDevices'
-import { colors } from '../theme/colors'
+import DiagnosticsDetailScreen from "../screens/dtcDetails";
+import ScanDevicesScreen from "../screens/ScanDevices";
+import AddVehicleScreen from "../screens/AddVehicle";
+import { colors } from "../theme/colors";
 
 export type RootStackParamList = {
   FindMechanics: { diagnosticCode: string };
@@ -40,14 +41,15 @@ export type RootStackParamList = {
     diagnosticCode: string;
   };
   ScanDevices: undefined;
+  AddVehicle: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator()
+const Tab = createBottomTabNavigator();
 
 function MainTabs() {
-  const colorScheme = useColorScheme()
-  const isDark = colorScheme === 'dark'
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
 
   return (
     <Tab.Navigator
@@ -62,18 +64,22 @@ function MainTabs() {
       }}
     >
       <Tab.Screen
-        name='Home'
+        name="Home"
         component={HomeScreen}
         options={{
-          tabBarIcon: ({ color, size }) => <Feather name='home' size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="home" size={size} color={color} />
+          ),
         }}
       />
       <Tab.Screen
-        name='FindMechanics'
+        name="FindMechanics"
         component={FindMechanicsScreen}
         options={{
-          title: 'Find Mechanics',
-          tabBarIcon: ({ color, size }) => <Feather name='search' size={size} color={color} />,
+          title: "Find Mechanics",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="search" size={size} color={color} />
+          ),
         }}
       />
       {/* <Tab.Screen
@@ -84,23 +90,24 @@ function MainTabs() {
         }}
       /> */}
       <Tab.Screen
-        name='Vehicles'
+        name="Vehicles"
         component={VehicleProfilesScreen}
         options={{
-          title: 'My Vehicles',
-          tabBarIcon: ({ color, size }) => <Feather name='truck' size={size} color={color} />,
+          title: "My Vehicles",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="truck" size={size} color={color} />
+          ),
         }}
       />
     </Tab.Navigator>
-  )
+  );
 }
 
 export default function AppNavigator() {
   const { user, isLoading } = useAuth();
 
-
   if (isLoading) {
-    return null // Or a loading screen
+    return null; // Or a loading screen
   }
 
   return (
@@ -134,6 +141,11 @@ export default function AppNavigator() {
             options={{ headerShown: true, title: "Diagnostic Details" }}
           />
           <Stack.Screen name="ScanDevices" component={ScanDevicesScreen} />
+          <Stack.Screen
+            name="AddVehicle"
+            component={AddVehicleScreen}
+            options={{ headerShown: false }}
+          />
         </>
       ) : (
         <>
@@ -146,4 +158,3 @@ export default function AppNavigator() {
     </Stack.Navigator>
   );
 }
-

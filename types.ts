@@ -9,6 +9,16 @@ export type User = {
 
 export type Car = {
   id: number;
+  name: string;
+  image: string;
+  lastSync: string;
+  obd: string;
+  status: "Active" | "Inactive" | "Maintenance";
+  progress: number;
+  alerts: number;
+  mileage: number;
+  lastService: string;
+  nextService: string;
   make: string;
   model: string;
   year: number;

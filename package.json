@@ -31,7 +31,10 @@
     "react-native-paper": "^5.14.5",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
-    "react-native-vector-icons": "^10.2.0"
+    "react-native-vector-icons": "^10.2.0",
+    "expo-image-picker": "~16.1.4",
+    "undefined": "react-native-picker/picker",
+    "@react-native-picker/picker": "2.11.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

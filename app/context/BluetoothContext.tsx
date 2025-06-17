@@ -9,7 +9,8 @@ import React, {
 } from "react";
 import { useBleConnection } from "../services/bleConnections";
 import { AppState } from "react-native";
-import Device from "react-native-ble-manager";
+import { Device } from "react-native-ble-plx";
+import { obdDataFunctions } from "../services/obdDataCollection";
 
 // Define the shape of our context
 interface BluetoothContextType {
@@ -18,7 +19,10 @@ interface BluetoothContextType {
   deviceId: string | null;
   deviceName: string | null;
   discoveredDevices: any[];
+  plxDevice: Device | null; // Assuming plxDevice is a Device type, adjust as needed
   voltage: string | null; // Assuming voltage is a number, adjust type as needed
+  rpm: number | null; 
+  speed: number | null;
   setDiscoveredDevices: (devices: any[]) => void;
   showDeviceSelector: boolean;
   setShowDeviceSelector: (show: boolean) => void;
@@ -34,7 +38,8 @@ interface BluetoothContextType {
   robustReconnect: () => Promise<boolean>;
   reconnectAttempt: number;
   enhancedVerifyConnection: (deviceId: string) => Promise<boolean>;
-  fetchVoltage: () => Promise<void>;
+  fetchVoltage: () => Promise<string | null>;
+  fetchRPM: () => Promise<number | null>;
   connectToBondedDeviceIfAvailable: () => Promise<string | null>;
 }
 
@@ -48,11 +53,17 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
   // Get base BLE functionality from the hook
   const bleConnectionHook = useBleConnection();
 
+  // State variables managed at the context level
   const [voltage, setVoltage] = useState<string | null>(null);
+  const [rpm, setRPM] = useState<number | null>(null);
+  const [speed, setSpeed] = useState<number | null>(null);
 
   // Maintain context-level state that persists across screens
   const [isConnected, setIsConnected] = useState(bleConnectionHook.isConnected);
   const [isScanning, setIsScanning] = useState(bleConnectionHook.isScanning);
+  const [lastSuccessfulCommandTime, setLastSuccessfulCommandTime] = useState(
+    bleConnectionHook.lastSuccessfulCommandTime
+  );
   const [deviceId, setDeviceId] = useState<string | null>(
     bleConnectionHook.deviceId
   );
@@ -91,7 +102,8 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
     bleConnectionHook.discoveredDevices,
     bleConnectionHook.showDeviceSelector,
     bleConnectionHook.rememberedDevice,
-    bleConnectionHook.voltage
+    bleConnectionHook.voltage,
+    bleConnectionHook.lastSuccessfulCommandTime,
   ]);
 
   useEffect(() => {
@@ -104,7 +116,6 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
       }
     })();
   }, []);
-
 
   // Monitor app state for background/foreground transitions
   useEffect(() => {
@@ -282,13 +293,41 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Create the complete context value by combining hook functions with enhanced ones
-  // Provide fetchVoltage from bleConnectionHook or define it here
-  const fetchVoltage = bleConnectionHook.fetchVoltage;
+  // Create wrapper functions that update state after calling service functions
+  const fetchVoltage = async (): Promise<string | null> => {
+    const voltageValue = await obdDataFunctions.fetchVoltage(
+      bleConnectionHook.plxDevice,
+      bleConnectionHook.sendCommand,
+      bleConnectionHook.logMessage
+    );
 
+    if (voltageValue) {
+      setVoltage(voltageValue);
+    }
+
+    return voltageValue;
+  };
+
+  const fetchRPM = async (): Promise<number | null> => {
+    const rpmValue = await obdDataFunctions.fetchRPM(
+      bleConnectionHook.plxDevice,
+      bleConnectionHook.sendCommand,
+      bleConnectionHook.logMessage
+    );
+
+    if (rpmValue !== null) {
+      setRPM(rpmValue);
+    }
+
+    return rpmValue;
+  };
+
+  // Add to context value
   const contextValue = {
     // Context-managed state
     voltage,
+    rpm,
+    speed,
     isScanning,
     isConnected,
     deviceId,
@@ -297,6 +336,8 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
     showDeviceSelector,
     rememberedDevice,
     reconnectAttempt,
+    lastSuccessfulCommandTime,
+    plxDevice: bleConnectionHook.plxDevice, // Assuming plxDevice is part of the hook
 
     // Enhanced functions with context state management
     setDiscoveredDevices,
@@ -314,7 +355,7 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
     enhancedVerifyConnection,
     // Pass through other hook functions
     fetchVoltage,
-
+    fetchRPM,
   };
 
   return (
@@ -324,11 +365,12 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// Custom hook to use the Bluetooth context
 export const useBluetooth = () => {
   const context = useContext(BluetoothContext);
+
   if (context === undefined) {
     throw new Error("useBluetooth must be used within a BluetoothProvider");
   }
+
   return context;
 };

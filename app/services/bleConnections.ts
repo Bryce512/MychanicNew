@@ -10,7 +10,6 @@ import BleManager from "react-native-ble-manager";
 import { BleManager as BlePlxManager, Device } from "react-native-ble-plx";
 import base64 from "react-native-base64";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { set } from "@react-native-firebase/database";
 import { Buffer } from "buffer";
 
 // Constants
@@ -67,7 +66,7 @@ export const useBleConnection = (options?: {
   // State variables
   const [isScanning, setIsScanning] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [voltage, setVoltage] = useState<string | null >(null);
+  const [voltage, setVoltage] = useState<string | null>(null);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const [showDeviceSelector, setShowDeviceSelector] = useState(false);
@@ -77,6 +76,7 @@ export const useBleConnection = (options?: {
   const [discoveredDevices, setDiscoveredDevices] = useState<BluetoothDevice[]>(
     []
   );
+  const lastSuccessfulCommandTime = useRef<number | null>(null);
   const [rememberedDevice, setRememberedDevice] =
     useState<BluetoothDevice | null>(null);
   const [plxDevice, setPlxDevice] = useState<Device | null>(null);
@@ -90,10 +90,8 @@ export const useBleConnection = (options?: {
   const [readCharUUID, setReadCharUUID] = useState<string>(
     "0000fff1-0000-1000-8000-00805f9b34fb"
   );
-  const responseBuffer = useRef<string>("");
   const activeOperations = useRef(0);
   const connectionLockTime = useRef<number | null>(null);
-  const lastSuccessfulCommandTime = useRef<number>(0); // Track last successful command time
 
   // In the useEffect
   useEffect(() => {
@@ -587,6 +585,7 @@ export const useBleConnection = (options?: {
 
       // Remember this device for future
       await rememberDevice(device);
+      await getPlxDeviceFromConnection(device.id);
 
       releaseLock(); // Release connection lock
       return true;
@@ -604,7 +603,17 @@ export const useBleConnection = (options?: {
       return false;
     }
 
-    return await connectToDevice(rememberedDevice);
+    await connectToDevice(rememberedDevice);
+
+    try {
+      initializeOBD(rememberedDevice.id);
+      return true;
+    } catch (error) {
+      logMessage(
+        `❌ Error initializing OBD for remembered device: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return false;
+    } 
   };
 
   // Save device for later use
@@ -833,94 +842,6 @@ export const useBleConnection = (options?: {
     }
   };
 
-  // Write to device with multiple fallback options
-  const writeToDevice = async (
-    targetDeviceId: string,
-    data: number[]
-  ): Promise<boolean> => {
-    if (!targetDeviceId) {
-      logMessage("❌ Cannot write: No device ID provided");
-      return false;
-    }
-
-    if (!data || data.length === 0) {
-      logMessage("❌ Cannot write: No data provided");
-      return false;
-    }
-
-    logMessage(`📤 Writing ${data.length} bytes to device ${targetDeviceId}`);
-
-    try {
-      // Try write first (preferred for OBD devices)
-      try {
-        await BleManager.write(
-          targetDeviceId,
-          writeServiceUUID,
-          writeCharUUID,
-          data
-        );
-        logMessage("✅ Write succeeded using write");
-        return true;
-      } catch (error1) {
-        logMessage(
-          `⚠️ write failed: ${error1 instanceof Error ? error1.message : String(error1)}`
-        );
-
-        // Fall back to regular write
-        logMessage("Attempting fallback to regular write...");
-        await BleManager.write(
-          targetDeviceId,
-          writeServiceUUID,
-          writeCharUUID,
-          data
-        );
-        logMessage("✅ Write succeeded using regular write");
-        return true;
-      }
-    } catch (error) {
-      logMessage(
-        `❌ All write methods failed: ${error instanceof Error ? error.message : String(error)}`
-      );
-      return false;
-    }
-  };
-
-  // Write without waiting for response
-  const writeWithoutWaiting = async (
-    targetDeviceId: string,
-    data: string
-  ): Promise<void> => {
-    if (!targetDeviceId) {
-      throw new Error("No device ID provided");
-    }
-
-    try {
-      const bytes = stringToBytes(data);
-      logMessage(`Writing raw bytes: [${bytes.join(", ")}]`);
-
-      await BleManager.write(
-        targetDeviceId,
-        writeServiceUUID,
-        writeCharUUID,
-        bytes
-      );
-    } catch (error) {
-      // Fall back to regular write if write fails
-      try {
-        const bytes = stringToBytes(data);
-        await BleManager.write(
-          targetDeviceId,
-          writeServiceUUID,
-          writeCharUUID,
-          bytes
-        );
-      } catch (innerError) {
-        throw new Error(
-          `Both write methods failed: ${innerError instanceof Error ? innerError.message : String(innerError)}`
-        );
-      }
-    }
-  };
 
   // Discover device characteristics
   const discoverDeviceProfile = async (
@@ -1044,271 +965,6 @@ export const useBleConnection = (options?: {
     }
   };
 
-  // Add this function to bleConnections.ts before the connectToDevice function
-  const findWriteCharacteristic = (
-    services: any
-  ): { service: string; characteristic: string } | null => {
-    try {
-      if (!services || !services.services) {
-        logMessage("No services available to find write characteristic");
-        return null;
-      }
-
-      // First, try to find a characteristic that supports write
-      for (const service of services.services) {
-        const serviceUUID = service.uuid;
-        const characteristics = (service as any).characteristics;
-
-        if (!characteristics) {
-          continue;
-        }
-
-        for (const char of characteristics) {
-          if (char.properties.write) {
-            logMessage(
-              `Found write characteristic: ${char.uuid} in service ${serviceUUID}`
-            );
-            return { service: serviceUUID, characteristic: char.uuid };
-          }
-        }
-      }
-
-      // If no write characteristic found, try one with just Write
-      for (const service of services.services) {
-        const serviceUUID = service.uuid;
-        const characteristics = (service as any).characteristics;
-
-        if (!characteristics) {
-          continue;
-        }
-
-        for (const char of characteristics) {
-          if (char.properties.Write) {
-            logMessage(
-              `Found Write characteristic: ${char.uuid} in service ${serviceUUID}`
-            );
-            return { service: serviceUUID, characteristic: char.uuid };
-          }
-        }
-      }
-
-      // Fallback to common OBD characteristic patterns
-      for (const service of services.services) {
-        const serviceUUID = service.uuid.toLowerCase();
-
-        if (serviceUUID.includes("fff0")) {
-          return {
-            service: serviceUUID,
-            characteristic: "0000fff2-0000-1000-8000-00805f9b34fb",
-          };
-        } else if (serviceUUID.includes("ffe0")) {
-          return {
-            service: serviceUUID,
-            characteristic: "0000ffe1-0000-1000-8000-00805f9b34fb",
-          };
-        }
-      }
-
-      logMessage("No suitable write characteristic found");
-      return null;
-    } catch (error) {
-      logMessage(
-        `Error finding write characteristic: ${error instanceof Error ? error.message : String(error)}`
-      );
-      return null;
-    }
-  };
-
-  // Find working read characteristic
-  const findWorkingReadCharacteristic = async (
-    targetDeviceId: string
-  ): Promise<{
-    success: boolean;
-    service?: string;
-    characteristic?: string;
-  }> => {
-    try {
-      logMessage(
-        "🔍🔍 STARTING READ CHARACTERISTIC DISCOVERY FOR: " + targetDeviceId
-      );
-
-      // First verify connection
-      const connected = await verifyConnection(targetDeviceId);
-      if (!connected) {
-        logMessage("❌ Cannot find read characteristic - device not connected");
-        return { success: false };
-      }
-
-      // Retrieve all services
-      logMessage("🔍 Retrieving services for read characteristic discovery...");
-      const services = await BleManager.retrieveServices(targetDeviceId);
-      if (!services || !services.services) {
-        logMessage("❌ No services found on device");
-        return { success: false };
-      }
-
-      logMessage(
-        `🔍 Found ${services.services.length} services to check for read characteristics`
-      );
-
-      // Track all potential read/notify characteristics
-      const candidateCharacteristics: {
-        serviceUUID: string;
-        characteristicUUID: string;
-      }[] = [];
-
-      // Find all characteristics with Notify property
-      for (const service of services.services) {
-        const serviceUUID = service.uuid;
-        logMessage(`🔍 Checking service: ${serviceUUID}`);
-
-        const characteristics = (service as any).characteristics;
-        if (!characteristics) {
-          logMessage(`  No characteristics in service ${serviceUUID}`);
-          continue;
-        }
-
-        for (const char of characteristics) {
-          // Log all characteristics for debugging
-          const props = Object.keys(char.properties || {})
-            .filter((p) => char.properties[p])
-            .join(", ");
-          logMessage(`  Characteristic ${char.uuid} (${props})`);
-
-          // Check if characteristic supports Read or Notify
-          if (char.properties.Notify || char.properties.Read) {
-            logMessage(
-              `  ✅ Found potential read characteristic: ${char.uuid}`
-            );
-            candidateCharacteristics.push({
-              serviceUUID: serviceUUID,
-              characteristicUUID: char.uuid,
-            });
-          }
-        }
-      }
-
-      logMessage(
-        `🔍 Found ${candidateCharacteristics.length} potential read characteristics to test`
-      );
-
-      // Try each characteristic
-      for (const candidate of candidateCharacteristics) {
-        logMessage(
-          `🔍 Testing characteristic ${candidate.characteristicUUID} in service ${candidate.serviceUUID}`
-        );
-
-        try {
-          // Try to start notifications
-          logMessage(`  Starting test notifications...`);
-          await BleManager.startNotification(
-            targetDeviceId,
-            candidate.serviceUUID,
-            candidate.characteristicUUID
-          );
-          logMessage(`  Notifications started, sending test command...`);
-
-          // Set up a promise that will resolve if we receive data
-          const testResult = await Promise.race([
-            // Promise that resolves when we get data
-            new Promise<boolean>((resolve) => {
-              logMessage(`  Setting up response listener...`);
-              const subscription = bleEmitter.addListener(
-                "BleManagerDidUpdateValueForCharacteristic",
-                (data) => {
-                  logMessage(
-                    `  👂 Listener received data on characteristic: ${data.characteristic}`
-                  );
-                  if (data.characteristic === candidate.characteristicUUID) {
-                    logMessage(
-                      `  ✅✅ RECEIVED DATA ON ${candidate.characteristicUUID} - FOUND WORKING CHARACTERISTIC!`
-                    );
-                    subscription.remove();
-                    resolve(true);
-                  } else {
-                    logMessage(
-                      `  Ignoring data on different characteristic: ${data.characteristic}`
-                    );
-                  }
-                }
-              );
-
-              // Send the ATZ command
-              logMessage(`  Sending test command ATZ...`);
-              writeToDevice(targetDeviceId, stringToBytes("ATZ\r"));
-            }),
-
-            // Timeout after 3 seconds
-            new Promise<boolean>((resolve) => {
-              setTimeout(() => {
-                logMessage(
-                  `  ⏱️ No response after 3 seconds on ${candidate.characteristicUUID}`
-                );
-                resolve(false);
-              }, 3000);
-            }),
-          ]);
-
-          // Stop notifications regardless of result
-          logMessage(`  Stopping test notifications...`);
-          await BleManager.stopNotification(
-            targetDeviceId,
-            candidate.serviceUUID,
-            candidate.characteristicUUID
-          ).catch((e) => {
-            logMessage(
-              `  Error stopping notifications: ${e instanceof Error ? e.message : String(e)}`
-            );
-          });
-
-          if (testResult === true) {
-            logMessage(`🎯🎯🎯 FOUND WORKING READ CHARACTERISTIC!`);
-            logMessage(`🎯 Service: ${candidate.serviceUUID}`);
-            logMessage(`🎯 Characteristic: ${candidate.characteristicUUID}`);
-
-            // Save these for future use
-            setWriteServiceUUID(candidate.serviceUUID);
-            setReadCharUUID(candidate.characteristicUUID);
-
-            // Start notifications on this characteristic for real
-            await BleManager.startNotification(
-              targetDeviceId,
-              candidate.serviceUUID,
-              candidate.characteristicUUID
-            );
-            logMessage(
-              `✅ Started notifications on confirmed working characteristic`
-            );
-
-            return {
-              success: true,
-              service: candidate.serviceUUID,
-              characteristic: candidate.characteristicUUID,
-            };
-          } else {
-            logMessage(
-              `❌ Test failed for ${candidate.characteristicUUID}, trying next...`
-            );
-          }
-        } catch (err) {
-          logMessage(
-            `❌ Error testing ${candidate.characteristicUUID}: ${err instanceof Error ? err.message : String(err)}`
-          );
-          // Continue to next characteristic
-        }
-      }
-
-      logMessage(
-        "❌ All characteristic tests failed - no working read characteristic found"
-      );
-      return { success: false };
-    } catch (error) {
-      logMessage(
-        `❌ Error in read characteristic discovery: ${error instanceof Error ? error.message : String(error)}`
-      );
-      return { success: false };
-    }
-  };
 
   // Initialize OBD device
   const initializeOBD = async (
@@ -1356,8 +1012,7 @@ export const useBleConnection = (options?: {
 
       for (const cmd of commands) {
         logMessage(`Sending init command: ${cmd}`);
-        await writeWithoutWaiting(finalDeviceId, `${cmd}\r`);
-        await delay(500); // Wait between commands
+        await delay(100); // Wait between commands
       }
 
       logMessage("✅ OBD initialization sequence completed");
@@ -1366,23 +1021,6 @@ export const useBleConnection = (options?: {
       logMessage(
         `❌ OBD initialization failed: ${error instanceof Error ? error.message : String(error)}`
       );
-      return false;
-    }
-  };
-
-  // This remains unchanged - used for full initialization sequences
-  const wakeUpDevice = async (device: Device): Promise<boolean> => {
-    try {
-      logMessage("💤 Performing full OBD device wake-up sequence...");
-
-      // Full wake-up implementation as before
-      // ...
-
-      // Update the last command time after a full wake-up
-      lastSuccessfulCommandTime.current = Date.now();
-      return true;
-    } catch (error) {
-      logMessage(`⚠️ Wake-up sequence failed: ${String(error)}`);
       return false;
     }
   };
@@ -1432,6 +1070,34 @@ export const useBleConnection = (options?: {
     }
   };
 
+  /**
+   * Helper function to wake up the OBD-II device
+   */
+  const wakeUpDevice = async (device: Device): Promise<boolean> => {
+    try {
+      logMessage("💤 Performing full OBD device wake-up sequence...");
+
+      try {
+        const wakeupCmd = Buffer.from("\r", "utf8").toString("base64");
+        await device.writeCharacteristicWithResponseForService(
+          SERVICE_UUID,
+          WRITE_UUID,
+          wakeupCmd
+        );
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      } catch (e) {
+        // Ignore wake-up errors
+      }
+
+      // Update the last command time after a full wake-up
+      lastSuccessfulCommandTime.current = Date.now();
+      return true;
+    } catch (error) {
+      logMessage(`⚠️ Wake-up sequence failed: ${String(error)}`);
+      return false;
+    }
+  };
+
   const sendCommand = async (
     device: Device,
     command: string,
@@ -1445,7 +1111,8 @@ export const useBleConnection = (options?: {
     // Try multiple times if needed
     let lastError: Error | null = null;
     const now = Date.now();
-    const needsWakeup = now - lastSuccessfulCommandTime.current > 5000; // 5 second threshold
+    const lastCmdTime = lastSuccessfulCommandTime.current ?? 0;
+    const needsWakeup = now - lastCmdTime > 5000; // 5 second threshold
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
@@ -1454,13 +1121,8 @@ export const useBleConnection = (options?: {
           logMessage("💤 Device may be sleeping, sending quick wake-up...");
           try {
             // Simple wake-up - just send a carriage return
-            const wakeupCommand = Buffer.from("\r", "utf8").toString("base64");
-            await device.writeCharacteristicWithResponseForService(
-              SERVICE_UUID,
-              WRITE_UUID,
-              wakeupCommand
-            );
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            await wakeUpDevice(device);
+            logMessage("✅ Device wake-up command sent successfully");
           } catch (wakeupError) {
             // Ignore wake-up errors
             logMessage("Wake-up command ignored error");
@@ -1470,17 +1132,6 @@ export const useBleConnection = (options?: {
           logMessage(
             `📢 Retry attempt ${attempt}/${retries} - sending wake-up signal...`
           );
-          try {
-            const wakeupCmd = Buffer.from("\r", "utf8").toString("base64");
-            await device.writeCharacteristicWithResponseForService(
-              SERVICE_UUID,
-              WRITE_UUID,
-              wakeupCmd
-            );
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          } catch (e) {
-            // Ignore wake-up errors
-          }
         }
 
         // Encode command properly for the OBD-II adapter
@@ -1625,51 +1276,6 @@ export const useBleConnection = (options?: {
     throw lastError || new Error("Unknown command error");
   };
 
-  const fetchVoltage = async (): Promise<void> => {
-    logMessage("🔋 Starting voltage fetch with enhanced reliability...");
-
-    try {
-      const plxDeviceInstance = await getPlxDeviceFromConnection(
-        deviceId || "53fc0537-e506-0bcf-81ec-e757067e9ed3"
-      );
-
-      if (plxDeviceInstance) {
-        logMessage("✅ PLX device connected, performing thorough wake-up...");
-
-        // First run the enhanced wake-up sequence
-        await wakeUpDevice(plxDeviceInstance);
-
-        // Then send the voltage command with retries
-        try {
-          logMessage("🔄 Sending voltage command with auto-retry...");
-          const response = await sendCommand(plxDeviceInstance, "AT RV", 2);
-
-          // Parse voltage from response
-          if (response) {
-            const voltageMatch = response.match(/(\d+\.?\d*)V?/);
-            if (voltageMatch) {
-              const voltage = voltageMatch[1];
-              setVoltage(voltage);
-              logMessage(`🔋 Detected voltage: ${voltage}V`);
-            } else {
-              logMessage(
-                `📬 Raw response: ${response} (could not parse voltage)`
-              );
-            }
-          }
-        } catch (error) {
-          logMessage(
-            `❌ All voltage command attempts failed: ${String(error)}`
-          );
-        }
-      } else {
-        logMessage("❌ Could not create PLX device connection");
-      }
-    } catch (error) {
-      logMessage(`❌ Error in voltage fetch: ${String(error)}`);
-    }
-  };
-
   // Methods
   return {
     // State Variables
@@ -1697,18 +1303,15 @@ export const useBleConnection = (options?: {
     verifyConnection,
     rememberDevice,
     forgetRememberedDevice,
-    writeToDevice,
-    writeWithoutWaiting,
     initializeOBD,
     discoverDeviceProfile,
-    findWorkingReadCharacteristic,
     forceClearLock,
+    getPlxDeviceFromConnection,
+    wakeUpDevice,
 
     // Setters for discoveredDevices if needed externally
     setDiscoveredDevices,
     connectToBondedDeviceIfAvailable,
 
-    // Data Collectors
-    fetchVoltage,
   };
 };
