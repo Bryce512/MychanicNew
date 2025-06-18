@@ -7,8 +7,8 @@ export type User = {
   cars: number[];
 };
 
-export type Car = {
-  id: number;
+export type vehicle = {
+  id: string;
   name: string;
   image: string;
   lastSync: string;
@@ -36,6 +36,6 @@ export type Diagnostic = {
 
 export type DiagnosticData = {
   user: User | null;
-  car: Car | null;
+  vehicle: vehicle | null;
   diagnostic: Diagnostic | null;
 };

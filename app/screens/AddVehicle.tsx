@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -16,6 +14,7 @@ import {
   Alert,
   Modal,
   FlatList,
+  PermissionsAndroid,
 } from "react-native";
 import { getDatabase, ref, get } from "@react-native-firebase/database";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -25,8 +24,14 @@ import { Feather } from "@expo/vector-icons";
 import Button from "../components/Button";
 import Card, { CardContent, CardHeader } from "../components/Card";
 import { colors } from "../theme/colors";
-import * as ImagePicker from "expo-image-picker";
 import firebaseService from "../services/firebaseService";
+import ImagePicker, {
+  launchCamera,
+  launchImageLibrary,
+  ImageLibraryOptions,
+  CameraOptions,
+  ImagePickerResponse,
+} from "react-native-image-picker";
 
 export default function AddVehicleScreen() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -104,32 +109,6 @@ export default function AddVehicleScreen() {
     }
   }, [make]);
 
-  const pickImage = async () => {
-    const permissionResult =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (permissionResult.granted === false) {
-      Alert.alert(
-        "Permission Required",
-        "You need to grant gallery permissions to upload a vehicle image."
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
-      // In a real app, you would upload this to Firebase Storage
-      // For now, we'll just set it directly
-    }
-  };
-
   const validateForm = () => {
     const newErrors: {
       name?: string;
@@ -171,6 +150,94 @@ export default function AddVehicleScreen() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Function to launch image picker
+  const openImagePicker = () => {
+    Alert.alert(
+      "Choose Image",
+      "Select a photo for your vehicle",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Take Photo",
+          onPress: () => takePhoto(),
+        },
+        {
+          text: "Choose from Gallery",
+          onPress: () => selectFromGallery(),
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  // Function to take a photo with the camera
+  const takePhoto = () => {
+    try {
+      // Request permissions first...
+
+      const options = {
+        mediaType: "photo" as const,
+        saveToPhotos: true,
+      };
+
+      console.log("Launching camera with callback...");
+      launchCamera(options, (response) => {
+        console.log("Camera response:", response);
+
+        if (response.assets && response.assets.length > 0) {
+          console.log("Image captured:", response.assets[0].uri);
+          setImage(response.assets[0].uri ?? null);
+        }
+      });
+    } catch (err) {
+      console.error("Camera error:", err);
+      Alert.alert("Error", "Failed to open camera");
+    }
+  };
+
+  // Function to select from gallery
+  const selectFromGallery = async () => {
+    try {
+      const options: ImageLibraryOptions = {
+        mediaType: "photo",
+        selectionLimit: 1,
+      };
+
+      console.log("Launching gallery directly...");
+      const result = await launchImageLibrary(options);
+      console.log("Gallery result:", result);
+
+      if (result.assets && result.assets.length > 0) {
+        console.log("Image selected:", result.assets[0].uri);
+        setImage(result.assets[0].uri ?? null);
+      }
+    } catch (err) {
+      console.error("Gallery error:", err);
+      Alert.alert("Error", "Failed to open photo gallery");
+    }
+  };
+
+  // Handle image picker response
+  const handleImagePickerResponse = (response: ImagePickerResponse) => {
+    if (response.didCancel) {
+      console.log("User cancelled image picker");
+    } else if (response.errorCode) {
+      console.log("ImagePicker Error: ", response.errorMessage);
+      Alert.alert("Error", "There was an error selecting the image");
+    } else if (response.assets && response.assets.length > 0) {
+      // Get the selected image uri
+      const selectedImage = response.assets[0];
+      setImage(selectedImage.uri ?? null);
+
+      // Here you would typically upload the image to Firebase Storage
+      // For now, we'll just set it to state
+      console.log("Selected image URI: ", selectedImage.uri);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!validateForm()) {
       return;
@@ -187,21 +254,69 @@ export default function AddVehicleScreen() {
         return;
       }
 
-      // Prepare vehicle data
+      // Upload image to Firebase Storage if available
+      let imageUrl =
+        "gs://fluid-tangent-405719.firebasestorage.app/public/car_default.png"; // Default image
+
+      if (image) {
+        try {
+          setImageUploading(true);
+          console.log("Starting image upload: ", image);
+
+          // Get the file name from the URI
+          const imagePath = image.split("/").pop();
+          const imageRef = `vehicles/${currentUser.uid}/${Date.now()}-${
+            imagePath || "vehicle_image"
+          }`;
+
+          // First, fetch the image as a blob
+          const response = await fetch(image);
+          const blob = await response.blob();
+
+          // Upload to Firebase Storage
+          const storage = firebaseService.getStorage();
+          const storageRef = firebaseService.storageRef(storage, imageRef);
+
+          // Upload the blob
+          const uploadTask = await firebaseService.uploadBytes(
+            storageRef,
+            blob
+          );
+          console.log("Image uploaded successfully");
+
+          // Get download URL
+          imageUrl = await firebaseService.getDownloadURL(storageRef);
+          console.log("Image download URL:", imageUrl);
+        } catch (uploadError) {
+          console.error("Error uploading image:", uploadError);
+          Alert.alert(
+            "Warning",
+            "Failed to upload image. Vehicle will be added with default image."
+          );
+          // Continue with default image
+        } finally {
+          setImageUploading(false);
+        }
+      }
+
+      // Prepare vehicle data with the proper image URL
       const vehicleData = {
         name: vehicleName.trim(),
         make: make,
         model: model,
         year: parseInt(year),
         mileage: parseInt(mileage),
-        image: image || "https://example.com/default-car.jpg", // In a real app, upload to Firebase Storage
-        status: "Good", // Default value
+        image: imageUrl, // Now this will be the Firebase Storage URL or default
+        status: "Good",
         obd: isOBDConnected,
-        progress: 100, // Default value
-        lastService: "3 months ago", // Default or empty
-        nextService: "In 2 months", // Default or calculated
-        alerts: 0, // Default value
+        progress: 100,
+        lastService: "3 months ago",
+        nextService: "In 2 months",
+        alerts: 0,
+        createdAt: new Date().toISOString(),
       };
+
+      console.log("Adding vehicle with data:", vehicleData);
 
       // Add vehicle to Firebase
       await firebaseService.addVehicle(currentUser.uid, vehicleData);
@@ -279,17 +394,17 @@ export default function AddVehicleScreen() {
                   )}
                 </View>
 
-                {/* Vehicle Image */}
+                {/* Vehicle Image URL */}
                 <View style={styles.formGroup}>
                   <Text style={[styles.label, isDark && styles.textMutedLight]}>
                     Vehicle Image
                   </Text>
                   <TouchableOpacity
-                    onPress={pickImage}
                     style={[
                       styles.imagePickerButton,
                       isDark && styles.imagePickerButtonDark,
                     ]}
+                    onPress={openImagePicker}
                   >
                     {image ? (
                       <Image
@@ -310,11 +425,19 @@ export default function AddVehicleScreen() {
                             isDark && styles.textMutedLight,
                           ]}
                         >
-                          Tap to upload image
+                          Tap to select image
                         </Text>
                       </View>
                     )}
                   </TouchableOpacity>
+                  {image && (
+                    <TouchableOpacity
+                      style={styles.removeImageButton}
+                      onPress={() => setImage(null)}
+                    >
+                      <Text style={styles.removeImageText}>Remove image</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {/* Make */}
@@ -393,6 +516,32 @@ export default function AddVehicleScreen() {
                   )}
                 </View>
 
+                {/* Model */}
+                <View style={styles.formGroup}>
+                  <Text style={[styles.label, isDark && styles.textMutedLight]}>
+                    Model
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.input,
+                      isDark && styles.inputDark,
+                      errors.model && styles.inputError,
+                    ]}
+                    onPress={() => setModel("FJ40")} // Keep the model input as is
+                  >
+                    <Text
+                      style={{
+                        color: isDark ? colors.white : colors.gray[900],
+                      }}
+                    >
+                      {model || "Select Model"}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {errors.model && (
+                    <Text style={styles.errorText}>{errors.model}</Text>
+                  )}
+                </View>
 
                 {/* Year */}
                 <View style={styles.formGroup}>
@@ -556,33 +705,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
   },
-  imagePickerButton: {
-    width: "100%",
-    height: 180,
+  imagePreviewContainer: {
+    marginTop: 8,
+    height: 150,
+    borderRadius: 8,
+    overflow: "hidden",
     borderWidth: 1,
     borderColor: colors.gray[300],
-    borderRadius: 8,
-    backgroundColor: colors.white,
-    justifyContent: "center",
-    alignItems: "center",
-    overflow: "hidden",
   },
-  imagePickerButtonDark: {
-    borderColor: colors.gray[700],
-    backgroundColor: colors.gray[800],
-  },
-  vehicleImage: {
+  imagePreview: {
     width: "100%",
     height: "100%",
-  },
-  imagePlaceholder: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  imagePlaceholderText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: colors.gray[500],
   },
   pickerContainer: {
     borderWidth: 1,
@@ -672,5 +805,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[300],
+  },
+  imagePickerButton: {
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    borderRadius: 8,
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.white,
+    height: 150,
+    position: "relative",
+  },
+  imagePickerButtonDark: {
+    borderColor: colors.gray[700],
+    backgroundColor: colors.gray[800],
+  },
+  vehicleImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 8,
+  },
+  imagePlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+    height: "100%",
+  },
+  imagePlaceholderText: {
+    marginTop: 8,
+    color: colors.gray[500],
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: colors.red[500],
+    borderRadius: 16,
+    padding: 6,
+  },
+  removeImageText: {
+    color: colors.white,
+    fontSize: 12,
   },
 });
