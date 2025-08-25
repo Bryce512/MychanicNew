@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import AuthProvider from './app/contexts/AuthContext';
+import {AuthProvider} from './app/contexts/AuthContext';
 import LoginScreen from './app/screens/Login';
 import { ThemeProvider } from './app/components/theme-provider';
 import firebaseService from './app/services/firebaseService';
