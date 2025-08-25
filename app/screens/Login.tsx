@@ -41,14 +41,8 @@ export default function LoginScreen() {
 
     try {
       const { error } = await signIn(email, password)
-
-      if (error) {
-        setErrorMessage(error.message)
-      } else {
-        // Navigate to Home screen on successful login
-        navigation.navigate("Home" as never)
-      }
-    } catch (error) {
+    }
+    catch (error) {
       setErrorMessage("An unexpected error occurred")
       console.error(error)
     } finally {
