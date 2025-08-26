@@ -10,40 +10,112 @@ import {
   TouchableOpacity,
   useColorScheme,
 } from "react-native";
+import { useBluetooth } from "../contexts/BluetoothContext";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation, NavigationProp } from "@react-navigation/native";
+import {
+  useNavigation,
+  NavigationProp,
+  useIsFocused,
+} from "@react-navigation/native";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { Feather } from "@expo/vector-icons";
 import Button from "../components/Button";
 import Card, { CardContent, CardHeader } from "../components/Card";
 import { colors } from "../theme/colors";
-import firebaseService, { addVehicle } from "../services/firebaseService";
+
+const DEFAULT_IMAGE =
+  "https://firebasestorage.googleapis.com/v0/b/fluid-tangent-405719.firebasestorage.app/o/public%2Fcar_default.png?alt=media&token=5232adad-a5f7-4b8c-be47-781163a7eaa1";
+import firebaseService from "../services/firebaseService";
+import { useDiagnostics } from "../contexts/VehicleDiagnosticsContext";
+import { pidCommands } from "../services/pidCommands";
+import { Alert } from "react-native";
 
 export default function VehicleProfilesScreen() {
+  // All hooks must be called unconditionally and in the same order on every render
+  const diagnosticsContext = useDiagnostics();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState(0);
   const [loading, setLoading] = useState(true);
+  const bluetoothContext = useBluetooth();
+  const { getCurrentVoltage, getEngineRPM } = pidCommands();
+  const isFocused = useIsFocused();
 
+  // Helper to sync diagnostics data (voltage, rpm) for selected vehicle
+  const syncVehicleDiagnostics = async () => {
+    const { deviceId, isConnected, plxDevice } = bluetoothContext;
+    const { diagnostics, refreshDiagnostics } = diagnosticsContext;
+    const vehicle = vehicles[selectedVehicle];
+    if (!isConnected || !plxDevice || !vehicle) {
+      Alert.alert(
+        "No OBD-II Device Connected",
+        "Please connect to an OBD-II device first."
+      );
+      return;
+    }
+    try {
+      const voltage = await getCurrentVoltage(plxDevice);
+      const rpm = await getEngineRPM(plxDevice);
+      // Parse voltage: extract first valid number (e.g., 12.4) from response string
+      let parsedVoltage = 0;
+      if (typeof voltage === "string") {
+        const match = voltage.match(/(\d+\.?\d*)/);
+        if (match) parsedVoltage = parseFloat(match[1]);
+      } else if (typeof voltage === "number") {
+        parsedVoltage = voltage;
+      }
+      // Update diagnostics context locally (refreshDiagnostics will reload from DB, so we update DB first)
+      const userId = firebaseService.getCurrentUser()?.uid;
+      if (!userId) throw new Error("No user ID");
+      // Prepare new diagnostics data
+      const newDiag = {
+        ...diagnostics[vehicle.id],
+        battV: parsedVoltage,
+        rpm: typeof rpm === "number" && !isNaN(rpm) ? rpm : 0,
+        lastSync: Date.now(),
+      };
+      // Update DB
+      await firebaseService.updateVehicleDiagInfo(userId, vehicle.id, newDiag);
+      // Refresh context from DB
+      await refreshDiagnostics();
+      Alert.alert("Diagnostics Synced", "Voltage and RPM updated.");
+    } catch (err) {
+      const errorMessage =
+        err && typeof err === "object" && "message" in err
+          ? (err as Error).message
+          : "Could not sync diagnostics.";
+      Alert.alert("Sync Failed", errorMessage);
+    }
+  };
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Feather
+          name="user"
+          size={24}
+          style={{ marginRight: 16 }}
+          onPress={() => navigation.navigate("Profile")}
+        />
+      ),
+      headerShown: true,
+      title: "My Vehicles",
+    });
+  }, [navigation]);
+
+  // Fetch vehicles on focus or when Bluetooth connection status/device changes
   useEffect(() => {
     const fetchVehicles = async () => {
       try {
         setLoading(true);
         const currentUser = firebaseService.getCurrentUser();
-        console.log("Current user:", currentUser);
-
         if (currentUser) {
-          // Ensure user has a database entry
           await firebaseService.ensureUserProfile(currentUser);
-
           const userVehicles = await firebaseService.getVehicles(
             currentUser.uid
           );
           setVehicles(userVehicles || []);
-          console.log("Fetched vehicles:", userVehicles);
-
           if (
             userVehicles?.length > 0 &&
             selectedVehicle >= userVehicles.length
@@ -52,15 +124,15 @@ export default function VehicleProfilesScreen() {
           }
         }
       } catch (error) {
-        console.error("Failed to fetch vehicles:", error);
         setVehicles([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchVehicles();
-
+    if (isFocused) {
+      fetchVehicles();
+    }
     // Subscribe to auth changes to reload vehicles when user changes
     const unsubscribe = firebaseService.onAuthChange((user) => {
       if (user) {
@@ -71,7 +143,8 @@ export default function VehicleProfilesScreen() {
     });
 
     return () => unsubscribe();
-  }, []);
+    // Add deviceId and isConnected as dependencies to rerender on Bluetooth changes
+  }, [isFocused, bluetoothContext.deviceId, bluetoothContext.isConnected]);
 
   const handleViewDiagnosticDetails = (
     navigation: NavigationProp<RootStackParamList>
@@ -84,7 +157,7 @@ export default function VehicleProfilesScreen() {
   };
 
   // Add loading state handling
-  if (loading) {
+  if (loading || diagnosticsContext.loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -95,6 +168,18 @@ export default function VehicleProfilesScreen() {
       </SafeAreaView>
     );
   }
+
+  // Helper to determine if the connect alert should be shown for the selected vehicle
+  const showConnectAlert = (() => {
+    const { deviceId, isConnected } = bluetoothContext;
+    if (!vehicles[selectedVehicle]) return false;
+    const vehicle = vehicles[selectedVehicle];
+    // Use the correct OBD UUID field (adjust if your DB uses a different field)
+    const expectedUuid = vehicle.obdUUID || vehicle.obdScannerUuid;
+    const vehicleIsConnected =
+      isConnected && deviceId && expectedUuid && deviceId === expectedUuid;
+    return !vehicleIsConnected;
+  })();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -108,12 +193,6 @@ export default function VehicleProfilesScreen() {
               Manage your vehicle profiles and view diagnostic data
             </Text>
           </View>
-
-          <Button
-            title="Add Vehicle"
-            onPress={() => navigation.navigate("AddVehicle")}
-            icon={<Feather name="plus" size={16} color={colors.white} />}
-          />
         </View>
 
         <View style={styles.content}>
@@ -123,159 +202,172 @@ export default function VehicleProfilesScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.vehicleListContainer}
           >
-            {vehicles.map((vehicle, index) => (
-              <TouchableOpacity
-                key={vehicle.id}
-                onPress={() => setSelectedVehicle(index)}
-                style={[
-                  styles.vehicleCard,
-                  selectedVehicle === index && styles.selectedVehicleCard,
-                  isDark && styles.vehicleCardDark,
-                  selectedVehicle === index &&
-                    isDark &&
-                    styles.selectedVehicleCardDark,
-                ]}
-              >
-                <View style={styles.vehicleCardHeader}>
-                  <Text
-                    style={[styles.vehicleName, isDark && styles.textLight]}
-                  >
-                    {vehicle.name}
-                  </Text>
+            {vehicles.map((vehicle, index) => {
+              const { deviceId, isConnected } = bluetoothContext;
+              const vehicleIsConnected =
+                isConnected && deviceId === vehicle.obdUUID;
+              return (
+                <TouchableOpacity
+                  key={vehicle.id}
+                  onPress={() => setSelectedVehicle(index)}
+                  style={[
+                    styles.vehicleCard,
+                    selectedVehicle === index && styles.selectedVehicleCard,
+                    isDark && styles.vehicleCardDark,
+                    selectedVehicle === index &&
+                      isDark &&
+                      styles.selectedVehicleCardDark,
+                  ]}
+                >
+                  <View style={styles.vehicleCardHeader}>
+                    <Text
+                      style={[styles.vehicleName, isDark && styles.textLight]}
+                    >
+                      {vehicle.name}
+                    </Text>
 
-                  <View
-                    style={[
-                      styles.connectionBadge,
-                      vehicle.obd
-                        ? styles.connectedBadge
-                        : styles.notConnectedBadge,
-                      isDark && styles.connectionBadgeDark,
-                    ]}
-                  >
-                    {vehicle.obd ? (
-                      <View style={styles.badgeContent}>
-                        <Feather
-                          name="check-circle"
-                          size={12}
-                          color={colors.green[500]}
-                        />
-                        <Text style={styles.connectedText}>Connected</Text>
-                      </View>
-                    ) : (
+                    <View
+                      style={[
+                        styles.connectionBadge,
+                        vehicleIsConnected
+                          ? styles.connectedBadge
+                          : styles.notConnectedBadge,
+                        isDark && styles.connectionBadgeDark,
+                      ]}
+                    >
+                      {vehicleIsConnected ? (
+                        <View style={styles.badgeContent}>
+                          <Feather
+                            name="check-circle"
+                            size={12}
+                            color={colors.green[500]}
+                          />
+                          <Text style={styles.connectedText}>Connected</Text>
+                        </View>
+                      ) : (
+                        <Text
+                          style={[
+                            styles.notConnectedText,
+                            isDark && styles.textMutedLight,
+                          ]}
+                        >
+                          Not Connected
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+
+                  <Image
+                    source={{ uri: vehicle.image || DEFAULT_IMAGE }}
+                    style={styles.vehicleImage}
+                    resizeMode="contain"
+                  />
+
+                  <View style={styles.vehicleStatus}>
+                    <View style={styles.statusHeader}>
                       <Text
                         style={[
-                          styles.notConnectedText,
+                          styles.statusLabel,
                           isDark && styles.textMutedLight,
                         ]}
                       >
-                        Not Connected
+                        Health Status
                       </Text>
-                    )}
-                  </View>
-                </View>
-
-                <Image
-                  source={{ uri: vehicle.image }}
-                  style={styles.vehicleImage}
-                  resizeMode="contain"
-                />
-
-                <View style={styles.vehicleStatus}>
-                  <View style={styles.statusHeader}>
-                    <Text
-                      style={[
-                        styles.statusLabel,
-                        isDark && styles.textMutedLight,
-                      ]}
-                    >
-                      Health Status
-                    </Text>
-                    <Text
-                      style={[
-                        styles.statusValue,
-                        vehicle.status === "Good"
-                          ? styles.statusGood
-                          : vehicle.status === "Fair"
+                      <Text
+                        style={[
+                          styles.statusValue,
+                          vehicle.status === "Good"
+                            ? styles.statusGood
+                            : vehicle.status === "Fair"
                             ? styles.statusFair
                             : vehicle.status === "Poor"
-                              ? styles.statusPoor
-                              : styles.statusUnknown,
-                        isDark &&
-                          vehicle.status === "Unknown" &&
-                          styles.textMutedLight,
-                      ]}
-                    >
-                      {vehicle.status}
-                    </Text>
-                  </View>
+                            ? styles.statusPoor
+                            : styles.statusUnknown,
+                          isDark &&
+                            vehicle.status === "Unknown" &&
+                            styles.textMutedLight,
+                        ]}
+                      >
+                        {vehicle.status}
+                      </Text>
+                    </View>
 
-                  <View style={styles.progressBarContainer}>
-                    <View
-                      style={[
-                        styles.progressBar,
-                        { width: `${vehicle.progress}%` },
-                        vehicle.status === "Good"
-                          ? styles.progressGood
-                          : vehicle.status === "Fair"
+                    <View style={styles.progressBarContainer}>
+                      <View
+                        style={[
+                          styles.progressBar,
+                          { width: `${vehicle.progress}%` },
+                          vehicle.status === "Good"
+                            ? styles.progressGood
+                            : vehicle.status === "Fair"
                             ? styles.progressFair
                             : vehicle.status === "Poor"
-                              ? styles.progressPoor
-                              : styles.progressUnknown,
-                      ]}
-                    />
-                  </View>
+                            ? styles.progressPoor
+                            : styles.progressUnknown,
+                        ]}
+                      />
+                    </View>
 
-                  <View style={styles.vehicleFooter}>
-                    {vehicle.obd ? (
-                      <View style={styles.syncInfo}>
-                        <Feather
-                          name="clock"
-                          size={12}
-                          color={isDark ? colors.gray[400] : colors.gray[500]}
-                        />
-                        <Text
-                          style={[
-                            styles.syncText,
-                            isDark && styles.textMutedLight,
-                          ]}
-                        >
-                          Last sync: {vehicle.lastSync}
-                        </Text>
-                      </View>
-                    ) : (
-                      <View style={styles.syncInfo}>
-                        <Feather
-                          name="alert-triangle"
-                          size={12}
-                          color={isDark ? colors.gray[400] : colors.gray[500]}
-                        />
-                        <Text
-                          style={[
-                            styles.syncText,
-                            isDark && styles.textMutedLight,
-                          ]}
-                        >
-                          Connect OBD-II for diagnostics
-                        </Text>
-                      </View>
-                    )}
+                    <View style={styles.vehicleFooter}>
+                      {vehicle.obdUUID ? (
+                        <View style={styles.syncInfo}>
+                          <Feather
+                            name="clock"
+                            size={12}
+                            color={isDark ? colors.gray[400] : colors.gray[500]}
+                          />
+                          <Text
+                            style={[
+                              styles.syncText,
+                              isDark && styles.textMutedLight,
+                            ]}
+                          >
+                            Last sync:{" "}
+                            {diagnosticsContext.diagnostics[vehicle.id]
+                              ?.lastSync
+                              ? new Date(
+                                  diagnosticsContext.diagnostics[
+                                    vehicle.id
+                                  ].lastSync
+                                ).toLocaleString()
+                              : "-"}
+                          </Text>
+                        </View>
+                      ) : !isConnected ? (
+                        <View style={styles.syncInfo}>
+                          <Feather
+                            name="alert-triangle"
+                            size={12}
+                            color={isDark ? colors.gray[400] : colors.gray[500]}
+                          />
+                          <Text
+                            style={[
+                              styles.syncText,
+                              isDark && styles.textMutedLight,
+                            ]}
+                          >
+                            Connect OBD-II for diagnostics
+                          </Text>
+                        </View>
+                      ) : null}
 
-                    {vehicle.alerts > 0 && (
-                      <View style={styles.alertInfo}>
-                        <Feather
-                          name="alert-triangle"
-                          size={12}
-                          color={colors.yellow[500]}
-                        />
-                        <Text style={styles.alertText}>
-                          {vehicle.alerts} alert
-                        </Text>
-                      </View>
-                    )}
+                      {vehicle.alerts > 0 && (
+                        <View style={styles.alertInfo}>
+                          <Feather
+                            name="alert-triangle"
+                            size={12}
+                            color={colors.yellow[500]}
+                          />
+                          <Text style={styles.alertText}>
+                            {vehicle.alerts} alert
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              );
+            })}
 
             <TouchableOpacity
               style={[
@@ -301,56 +393,94 @@ export default function VehicleProfilesScreen() {
           {vehicles.length > 0 ? (
             <Card style={styles.detailsCard}>
               <CardHeader style={styles.detailsCardHeader}>
-                <View>
-                  <Text
-                    style={[styles.detailsTitle, isDark && styles.textLight]}
-                  >
-                    {vehicles[selectedVehicle].name}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.detailsMileage,
-                      isDark && styles.textMutedLight,
-                    ]}
-                  >
-                    {vehicles[selectedVehicle].mileage.toLocaleString()} miles
-                  </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <View>
+                    <Text
+                      style={[styles.detailsTitle, isDark && styles.textLight]}
+                    >
+                      {vehicles[selectedVehicle].name}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.detailsMileage,
+                        isDark && styles.textMutedLight,
+                      ]}
+                    >
+                      {vehicles[selectedVehicle].mileage.toLocaleString()} miles
+                    </Text>
+                  </View>
+                  <Feather
+                    name="edit-2"
+                    size={22}
+                    color={isDark ? colors.white : colors.primary[500]}
+                    style={{ marginLeft: 12 }}
+                    onPress={() => {
+                      const userId = firebaseService.getCurrentUser()?.uid;
+                      if (userId) {
+                        navigation.navigate("EditVehicleInfo", {
+                          vehicle: vehicles[selectedVehicle],
+                          userId,
+                        });
+                      }
+                    }}
+                  />
                 </View>
 
                 <View style={styles.detailsActions}>
-                  {vehicles[selectedVehicle].obd ? (
-                    <Button
-                      title="Sync Data"
-                      onPress={() => {}}
-                      variant="outline"
-                      size="sm"
-                      icon={
-                        <Feather
-                          name="refresh-cw"
-                          size={14}
-                          color={isDark ? colors.white : colors.primary[500]}
+                  {(() => {
+                    const { deviceId, isConnected, plxDevice } =
+                      bluetoothContext;
+                    const vehicle = vehicles[selectedVehicle];
+                    const vehicleIsConnected = isConnected; // && deviceId === vehicle.obdUUID;
+                    if (vehicleIsConnected) {
+                      return (
+                        <Button
+                          title="Sync Data"
+                          onPress={syncVehicleDiagnostics}
+                          variant="outline"
+                          size="sm"
+                          icon={
+                            <Feather
+                              name="refresh-cw"
+                              size={14}
+                              color={
+                                isDark ? colors.white : colors.primary[500]
+                              }
+                            />
+                          }
                         />
-                      }
-                    />
-                  ) : (
-                    <Button
-                      title="Connect OBD-II"
-                      onPress={() => {}}
-                      size="sm"
-                      icon={
-                        <Feather
-                          name="upload-cloud"
-                          size={14}
-                          color={colors.white}
+                      );
+                    } else {
+                      return (
+                        <Button
+                          title="Connect OBD-II"
+                          onPress={() =>
+                            navigation.navigate("ScanDevices" as never)
+                          }
+                          size="sm"
+                          icon={
+                            <Feather
+                              name="upload-cloud"
+                              size={14}
+                              color={colors.white}
+                            />
+                          }
                         />
-                      }
-                    />
-                  )}
+                      );
+                    }
+                  })()}
                 </View>
               </CardHeader>
 
               <CardContent style={styles.detailsCardContent}>
-                {!vehicles[selectedVehicle].obd && (
+                {/* Only show alert if NOT connected */}
+                {showConnectAlert && (
                   <View
                     style={[styles.alertCard, isDark && styles.alertCardDark]}
                   >
@@ -419,7 +549,7 @@ export default function VehicleProfilesScreen() {
                               isDark && styles.textLight,
                             ]}
                           >
-                            {selectedVehicle === 0 ? "2018" : "2015"}
+                            {vehicles[selectedVehicle]?.year || "-"}
                           </Text>
                         </View>
                         <View style={styles.infoRow}>
@@ -437,7 +567,7 @@ export default function VehicleProfilesScreen() {
                               isDark && styles.textLight,
                             ]}
                           >
-                            {selectedVehicle === 0 ? "Toyota" : "Honda"}
+                            {vehicles[selectedVehicle]?.make || "-"}
                           </Text>
                         </View>
                         <View style={styles.infoRow}>
@@ -455,7 +585,7 @@ export default function VehicleProfilesScreen() {
                               isDark && styles.textLight,
                             ]}
                           >
-                            {selectedVehicle === 0 ? "Camry" : "Civic"}
+                            {vehicles[selectedVehicle]?.model || "-"}
                           </Text>
                         </View>
                         <View style={styles.infoRow}>
@@ -473,15 +603,14 @@ export default function VehicleProfilesScreen() {
                               isDark && styles.textLight,
                             ]}
                           >
-                            {selectedVehicle === 0
-                              ? "2.5L 4-Cylinder"
-                              : "1.8L 4-Cylinder"}
+                            {vehicles[selectedVehicle]?.engine || "-"}
                           </Text>
                         </View>
                       </View>
                     </CardContent>
                   </Card>
-
+                </View>
+                <View style={styles.serviceInfo}>
                   <Card style={styles.infoCard}>
                     <CardHeader style={styles.infoCardHeader}>
                       <Text
@@ -571,7 +700,7 @@ export default function VehicleProfilesScreen() {
                   </Card>
                 </View>
 
-                {vehicles[selectedVehicle].obd && (
+                <View>
                   <Card style={styles.diagnosticsCard}>
                     <CardHeader style={styles.diagnosticsCardHeader}>
                       <Text
@@ -585,159 +714,220 @@ export default function VehicleProfilesScreen() {
                     </CardHeader>
                     <CardContent>
                       <View style={styles.diagnosticsGrid}>
-                        <TouchableOpacity
-                          style={[
-                            styles.diagnosticItem,
-                            isDark && styles.diagnosticItemDark,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.diagnosticLabel,
-                              isDark && styles.textMutedLight,
-                            ]}
-                          >
-                            Engine
-                          </Text>
-                          <View style={styles.diagnosticValue}>
-                            <Feather
-                              name="zap"
-                              size={16}
-                              color={colors.green[500]}
-                            />
-                            <Text
+                        {vehicles[selectedVehicle] &&
+                        diagnosticsContext.diagnostics[
+                          vehicles[selectedVehicle].id
+                        ] ? (
+                          <>
+                            {/* Engine */}
+                            <TouchableOpacity
                               style={[
-                                styles.diagnosticText,
-                                isDark && styles.textLight,
+                                styles.diagnosticItem,
+                                isDark && styles.diagnosticItemDark,
                               ]}
                             >
-                              Good
-                            </Text>
-                            <Feather
-                              name="chevron-right"
-                              size={16}
-                              color={
-                                isDark ? colors.gray[400] : colors.gray[500]
-                              }
-                            />
-                          </View>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[
-                            styles.diagnosticItem,
-                            isDark && styles.diagnosticItemDark,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.diagnosticLabel,
-                              isDark && styles.textMutedLight,
-                            ]}
-                          >
-                            Oil Life
-                          </Text>
-                          <View style={styles.diagnosticValue}>
-                            <Feather
-                              name="droplet"
-                              size={16}
-                              color={colors.yellow[500]}
-                            />
-                            <Text
+                              <Text
+                                style={[
+                                  styles.diagnosticLabel,
+                                  isDark && styles.textMutedLight,
+                                ]}
+                              >
+                                Engine
+                              </Text>
+                              <View style={styles.diagnosticValue}>
+                                <Feather
+                                  name="zap"
+                                  size={16}
+                                  color={colors.green[500]}
+                                />
+                                <Text
+                                  style={[
+                                    styles.diagnosticText,
+                                    isDark && styles.textLight,
+                                  ]}
+                                >
+                                  {diagnosticsContext.diagnostics[
+                                    vehicles[selectedVehicle].id
+                                  ].engineRunning
+                                    ? "Running"
+                                    : "Off"}
+                                </Text>
+                                <Feather
+                                  name="chevron-right"
+                                  size={16}
+                                  color={
+                                    isDark ? colors.gray[400] : colors.gray[500]
+                                  }
+                                />
+                              </View>
+                            </TouchableOpacity>
+                            {/* Oil Life */}
+                            <TouchableOpacity
                               style={[
-                                styles.diagnosticText,
-                                isDark && styles.textLight,
+                                styles.diagnosticItem,
+                                isDark && styles.diagnosticItemDark,
                               ]}
                             >
-                              42%
-                            </Text>
-                            <Feather
-                              name="chevron-right"
-                              size={16}
-                              color={
-                                isDark ? colors.gray[400] : colors.gray[500]
-                              }
-                            />
-                          </View>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[
-                            styles.diagnosticItem,
-                            isDark && styles.diagnosticItemDark,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.diagnosticLabel,
-                              isDark && styles.textMutedLight,
-                            ]}
-                          >
-                            Battery
-                          </Text>
-                          <View style={styles.diagnosticValue}>
-                            <Feather
-                              name="battery"
-                              size={16}
-                              color={colors.green[500]}
-                            />
-                            <Text
+                              <Text
+                                style={[
+                                  styles.diagnosticLabel,
+                                  isDark && styles.textMutedLight,
+                                ]}
+                              >
+                                Oil Life
+                              </Text>
+                              <View style={styles.diagnosticValue}>
+                                <Feather
+                                  name="droplet"
+                                  size={16}
+                                  color={colors.yellow[500]}
+                                />
+                                <Text
+                                  style={[
+                                    styles.diagnosticText,
+                                    isDark && styles.textLight,
+                                  ]}
+                                >
+                                  {diagnosticsContext.diagnostics[
+                                    vehicles[selectedVehicle].id
+                                  ].milesSinceLastOilChange &&
+                                  diagnosticsContext.diagnostics[
+                                    vehicles[selectedVehicle].id
+                                  ].milesBetweenOilChanges
+                                    ? `${Math.max(
+                                        0,
+                                        100 -
+                                          Math.round(
+                                            (diagnosticsContext.diagnostics[
+                                              vehicles[selectedVehicle].id
+                                            ].milesSinceLastOilChange /
+                                              diagnosticsContext.diagnostics[
+                                                vehicles[selectedVehicle].id
+                                              ].milesBetweenOilChanges) *
+                                              100
+                                          )
+                                      )}%`
+                                    : "-"}
+                                </Text>
+                                <Feather
+                                  name="chevron-right"
+                                  size={16}
+                                  color={
+                                    isDark ? colors.gray[400] : colors.gray[500]
+                                  }
+                                />
+                              </View>
+                            </TouchableOpacity>
+                            {/* Battery */}
+                            <TouchableOpacity
                               style={[
-                                styles.diagnosticText,
-                                isDark && styles.textLight,
+                                styles.diagnosticItem,
+                                isDark && styles.diagnosticItemDark,
                               ]}
                             >
-                              Good (12.6V)
-                            </Text>
-                            <Feather
-                              name="chevron-right"
-                              size={16}
-                              color={
-                                isDark ? colors.gray[400] : colors.gray[500]
-                              }
-                            />
-                          </View>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[
-                            styles.diagnosticItem,
-                            isDark && styles.diagnosticItemDark,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.diagnosticLabel,
-                              isDark && styles.textMutedLight,
-                            ]}
-                          >
-                            Brakes
-                          </Text>
-                          <View style={styles.diagnosticValue}>
-                            <Feather
-                              name="alert-triangle"
-                              size={16}
-                              color={colors.yellow[500]}
-                            />
-                            <Text
+                              <Text
+                                style={[
+                                  styles.diagnosticLabel,
+                                  isDark && styles.textMutedLight,
+                                ]}
+                              >
+                                Battery
+                              </Text>
+                              <View style={styles.diagnosticValue}>
+                                <Feather
+                                  name="battery"
+                                  size={16}
+                                  color={colors.green[500]}
+                                />
+                                <Text
+                                  style={[
+                                    styles.diagnosticText,
+                                    isDark && styles.textLight,
+                                  ]}
+                                >
+                                  {diagnosticsContext.diagnostics[
+                                    vehicles[selectedVehicle].id
+                                  ].battV
+                                    ? `${
+                                        diagnosticsContext.diagnostics[
+                                          vehicles[selectedVehicle].id
+                                        ].battV
+                                      }V`
+                                    : "-"}
+                                </Text>
+                                <Feather
+                                  name="chevron-right"
+                                  size={16}
+                                  color={
+                                    isDark ? colors.gray[400] : colors.gray[500]
+                                  }
+                                />
+                              </View>
+                            </TouchableOpacity>
+                            {/* Brakes */}
+                            <TouchableOpacity
                               style={[
-                                styles.diagnosticText,
-                                isDark && styles.textLight,
+                                styles.diagnosticItem,
+                                isDark && styles.diagnosticItemDark,
                               ]}
                             >
-                              Fair (32%)
-                            </Text>
-                            <Feather
-                              name="chevron-right"
-                              size={16}
-                              color={
-                                isDark ? colors.gray[400] : colors.gray[500]
-                              }
-                            />
-                          </View>
-                        </TouchableOpacity>
+                              <Text
+                                style={[
+                                  styles.diagnosticLabel,
+                                  isDark && styles.textMutedLight,
+                                ]}
+                              >
+                                Brakes
+                              </Text>
+                              <View style={styles.diagnosticValue}>
+                                <Feather
+                                  name="alert-triangle"
+                                  size={16}
+                                  color={colors.yellow[500]}
+                                />
+                                <Text
+                                  style={[
+                                    styles.diagnosticText,
+                                    isDark && styles.textLight,
+                                  ]}
+                                >
+                                  {diagnosticsContext.diagnostics[
+                                    vehicles[selectedVehicle].id
+                                  ].milesSinceLastBrakeService &&
+                                  diagnosticsContext.diagnostics[
+                                    vehicles[selectedVehicle].id
+                                  ].milesBetweenBrakeService
+                                    ? `${Math.max(
+                                        0,
+                                        100 -
+                                          Math.round(
+                                            (diagnosticsContext.diagnostics[
+                                              vehicles[selectedVehicle].id
+                                            ].milesSinceLastBrakeService /
+                                              diagnosticsContext.diagnostics[
+                                                vehicles[selectedVehicle].id
+                                              ].milesBetweenBrakeService) *
+                                              100
+                                          )
+                                      )}%`
+                                    : "-"}
+                                </Text>
+                                <Feather
+                                  name="chevron-right"
+                                  size={16}
+                                  color={
+                                    isDark ? colors.gray[400] : colors.gray[500]
+                                  }
+                                />
+                              </View>
+                            </TouchableOpacity>
+                          </>
+                        ) : (
+                          <Text style={styles.diagnosticText}>
+                            No diagnostics available
+                          </Text>
+                        )}
                       </View>
-
                       <Button
                         title="View Full Diagnostics"
                         onPress={() => handleViewDiagnosticDetails(navigation)}
@@ -752,7 +942,7 @@ export default function VehicleProfilesScreen() {
                       />
                     </CardContent>
                   </Card>
-                )}
+                </View>
               </CardContent>
             </Card>
           ) : (

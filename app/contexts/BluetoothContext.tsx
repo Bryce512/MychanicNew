@@ -1,3 +1,4 @@
+import { Alert } from "react-native";
 import React, {
   createContext,
   useContext,
@@ -11,6 +12,7 @@ import { useBleConnection } from "../services/bleConnections";
 import { AppState } from "react-native";
 import { Device } from "react-native-ble-plx";
 import { obdDataFunctions } from "../services/obdDataCollection";
+import BluetoothManager from "../services/BluetoothManager";
 
 // Define the shape of our context
 interface BluetoothContextType {
@@ -21,7 +23,7 @@ interface BluetoothContextType {
   discoveredDevices: any[];
   plxDevice: Device | null; // Assuming plxDevice is a Device type, adjust as needed
   voltage: string | null; // Assuming voltage is a number, adjust type as needed
-  rpm: number | null; 
+  rpm: number | null;
   speed: number | null;
   setDiscoveredDevices: (devices: any[]) => void;
   showDeviceSelector: boolean;
@@ -40,7 +42,7 @@ interface BluetoothContextType {
   enhancedVerifyConnection: (deviceId: string) => Promise<boolean>;
   fetchVoltage: () => Promise<string | null>;
   fetchRPM: () => Promise<number | null>;
-  connectToBondedDeviceIfAvailable: () => Promise<string | null>;
+  // connectToBondedDeviceIfAvailable: () => Promise<string | null>;
 }
 
 // Create the context
@@ -75,8 +77,8 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
     bleConnectionHook.showDeviceSelector
   );
 
-  const connectToBondedDeviceIfAvailable =
-    bleConnectionHook.connectToBondedDeviceIfAvailable;
+  // const connectToBondedDeviceIfAvailable =
+  //   bleConnectionHook.connectToBondedDeviceIfAvailable;
 
   const [rememberedDevice, setRememberedDevice] = useState(
     bleConnectionHook.rememberedDevice
@@ -109,13 +111,15 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     // Try to reconnect automatically on app start
     (async () => {
-      const connectedDevice = await connectToBondedDeviceIfAvailable();
-      if (connectedDevice) {
-        setDeviceId(connectedDevice.id);
-        setIsConnected(true);
+      if (rememberedDevice) {
+        const connected = await connectToDevice(rememberedDevice);
+        if (connected) {
+          setDeviceId(rememberedDevice.id);
+          setIsConnected(true);
+        }
       }
     })();
-  }, []);
+  }, [rememberedDevice]);
 
   // Monitor app state for background/foreground transitions
   useEffect(() => {
@@ -146,8 +150,9 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
   // Enhanced version of verifyConnection that updates context state
   const verifyConnection = async (deviceId: string): Promise<boolean> => {
     try {
-      const isStillConnected =
-        await bleConnectionHook.verifyConnection(deviceId);
+      const isStillConnected = await bleConnectionHook.verifyConnection(
+        deviceId
+      );
       setIsConnected(isStillConnected);
       return isStillConnected;
     } catch (error) {
@@ -174,7 +179,11 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Enhanced connect function that updates context state
-  const connectToDevice = async (device: any): Promise<boolean> => {
+  // Accept vehicleId for alert logic
+  const connectToDevice = async (
+    device: any,
+    vehicleId?: string
+  ): Promise<boolean> => {
     try {
       logMessage(`Connecting to ${device.name || "Unnamed Device"}...`);
       const success = await bleConnectionHook.connectToDevice(device);
@@ -184,12 +193,46 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
         setDeviceId(device.id);
         setDeviceName(device.name);
         setRememberedDevice(device);
+
+        // 2-week mileage alert logic
+        if (vehicleId) {
+          try {
+            const user =
+              require("../services/firebaseService").default.getCurrentUser();
+            if (user) {
+              const diag =
+                await require("../services/firebaseService").default.getVehicleDiagInfo(
+                  user.uid,
+                  vehicleId
+                );
+              const lastMileageUpdate = diag?.lastMileageUpdate;
+              if (
+                !lastMileageUpdate ||
+                Date.now() - lastMileageUpdate > 14 * 24 * 60 * 60 * 1000
+              ) {
+                Alert.alert(
+                  "Mileage Update Needed",
+                  "It's been over 2 weeks since you last updated your vehicle's mileage. Please update it now.",
+                  [{ text: "OK" }]
+                );
+              }
+            }
+          } catch (e) {
+            let msg =
+              typeof e === "object" && e && "message" in e
+                ? (e as any).message
+                : String(e);
+            logMessage("Could not check last mileage update: " + msg);
+          }
+        }
       }
 
       return success;
     } catch (error) {
       logMessage(
-        `Connection error: ${error instanceof Error ? error.message : String(error)}`
+        `Connection error: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
       return false;
     }
@@ -210,7 +253,9 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
       return success;
     } catch (error) {
       logMessage(
-        `Reconnection error: ${error instanceof Error ? error.message : String(error)}`
+        `Reconnection error: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
       return false;
     }
@@ -224,7 +269,9 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
       setDeviceId(null);
     } catch (error) {
       logMessage(
-        `Disconnect error: ${error instanceof Error ? error.message : String(error)}`
+        `Disconnect error: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
     }
   };
@@ -268,7 +315,9 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
       return success;
     } catch (error) {
       logMessage(
-        `Robust reconnect error: ${error instanceof Error ? error.message : String(error)}`
+        `Robust reconnect error: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
       return false;
     }
@@ -348,7 +397,7 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
     connectToDevice,
     disconnectDevice: disconnectDevice,
     connectToRememberedDevice,
-    connectToBondedDeviceIfAvailable,
+    // connectToBondedDeviceIfAvailable,
     verifyConnection,
     logMessage,
     robustReconnect,

@@ -11,6 +11,7 @@ import { BleManager as BlePlxManager, Device } from "react-native-ble-plx";
 import base64 from "react-native-base64";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Buffer } from "buffer";
+import BluetoothManager from "./BluetoothManager";
 
 // Constants
 const { BleManager: BleManagerModule } = NativeModules;
@@ -94,9 +95,24 @@ export const useBleConnection = (options?: {
   const connectionLockTime = useRef<number | null>(null);
 
   // In the useEffect
+  // Only call loadRememberedDevice once on mount
   useEffect(() => {
+    logMessage(
+      "[BLE] useEffect mount: initializing BLE and loading remembered device"
+    );
     initializeBLE(deviceId || "");
-
+    let didRun = false;
+    (async () => {
+      if (!didRun && !isConnected && !isScanning) {
+        logMessage("[BLE] Calling loadRememberedDevice (first mount)");
+        await loadRememberedDevice();
+        didRun = true;
+      } else {
+        logMessage(
+          "[BLE] Skipping loadRememberedDevice: already connected or scanning"
+        );
+      }
+    })();
     // Clean up listeners
     return () => {
       if (activeOperations.current === 0) {
@@ -208,7 +224,9 @@ export const useBleConnection = (options?: {
       return true;
     } catch (error) {
       logMessage(
-        `❌ Error during disconnect: ${error instanceof Error ? error.message : String(error)}`
+        `❌ Error during disconnect: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
 
       // Check if we're actually still connected
@@ -273,7 +291,9 @@ export const useBleConnection = (options?: {
             const exists = prevDevices.some((d) => d.id === device.id);
             if (!exists) {
               logMessage(
-                `🔍 Found device: ${device.name || "Unnamed"} (${device.id}), RSSI: ${device.rssi}`
+                `🔍 Found device: ${device.name || "Unnamed"} (${
+                  device.id
+                }), RSSI: ${device.rssi}`
               );
               return [
                 ...prevDevices,
@@ -319,7 +339,9 @@ export const useBleConnection = (options?: {
           }
         } catch (err) {
           logMessage(
-            `❌ Error stopping scan: ${err instanceof Error ? err.message : String(err)}`
+            `❌ Error stopping scan: ${
+              err instanceof Error ? err.message : String(err)
+            }`
           );
         }
 
@@ -329,7 +351,9 @@ export const useBleConnection = (options?: {
     } catch (err) {
       setIsScanning(false);
       logMessage(
-        `❌ Error during scan: ${err instanceof Error ? err.message : String(err)}`
+        `❌ Error during scan: ${
+          err instanceof Error ? err.message : String(err)
+        }`
       );
     }
   };
@@ -366,48 +390,48 @@ export const useBleConnection = (options?: {
     }
   }
 
-  async function connectToBondedDeviceIfAvailable() {
-    try {
-      // Retrieve bonded devices (Android only)
-      const bondedDevices = await BleManager.getBondedPeripherals();
+  // async function connectToBondedDeviceIfAvailable() {
+  //   try {
+  //     // Retrieve bonded devices (Android only)
+  //     const bondedDevices = await BleManager.getBondedPeripherals();
 
-      console.log("Bonded devices:", bondedDevices);
+  //     console.log("Bonded devices:", bondedDevices);
 
-      // Find the target device by name or id
-      const targetDevice = bondedDevices.find(
-        (device) =>
-          device.name === TARGET_DEVICE_NAME || device.id === TARGET_DEVICE_ID
-      );
+  //     // Find the target device by name or id
+  //     const targetDevice = bondedDevices.find(
+  //       (device) =>
+  //         device.name === TARGET_DEVICE_NAME || device.id === TARGET_DEVICE_ID
+  //     );
 
-      if (!targetDevice) {
-        console.log("No bonded target device found");
-        return null;
-      }
+  //     if (!targetDevice) {
+  //       console.log("No bonded target device found");
+  //       return null;
+  //     }
 
-      // Check if already connected (optional)
-      const connectedDevices = await BleManager.getConnectedPeripherals([]);
-      const isAlreadyConnected = connectedDevices.some(
-        (d) => d.id === targetDevice.id
-      );
-      if (isAlreadyConnected) {
-        console.log("Device already connected");
-        return targetDevice;
-      }
+  //     // Check if already connected (optional)
+  //     const connectedDevices = await BleManager.getConnectedPeripherals([]);
+  //     const isAlreadyConnected = connectedDevices.some(
+  //       (d) => d.id === targetDevice.id
+  //     );
+  //     if (isAlreadyConnected) {
+  //       console.log("Device already connected");
+  //       return targetDevice;
+  //     }
 
-      // Connect to the device
-      console.log(`Connecting to bonded device ${targetDevice.id}...`);
-      await BleManager.connect(targetDevice.id);
-      console.log("Connected!");
+  //     // Connect to the device
+  //     console.log(`Connecting to bonded device ${targetDevice.id}...`);
+  //     await BleManager.connect(targetDevice.id);
+  //     console.log("Connected!");
 
-      // Optional: retrieve services
-      await BleManager.retrieveServices(targetDevice.id);
+  //     // Optional: retrieve services
+  //     await BleManager.retrieveServices(targetDevice.id);
 
-      return targetDevice;
-    } catch (error) {
-      console.error("Failed to connect to bonded device:", error);
-      return null;
-    }
-  }
+  //     return targetDevice;
+  //   } catch (error) {
+  //     console.error("Failed to connect to bonded device:", error);
+  //     return null;
+  //   }
+  // }
 
   const initializeBLE = async (deviceID: string) => {
     logMessage("🔄 Initializing Bluetooth module...");
@@ -433,7 +457,9 @@ export const useBleConnection = (options?: {
       await loadRememberedDevice();
     } catch (error) {
       logMessage(
-        `❌ Failed to initialize BLE: ${error instanceof Error ? error.message : String(error)}`
+        `❌ Failed to initialize BLE: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
     }
   };
@@ -489,7 +515,9 @@ export const useBleConnection = (options?: {
       logMessage("✅ Notifications started");
     } catch (err) {
       logMessage(
-        `❌ startNotification failed: ${err instanceof Error ? err.message : String(err)}`
+        `❌ startNotification failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`
       );
     }
   };
@@ -520,13 +548,17 @@ export const useBleConnection = (options?: {
         return true;
       } catch (rssiError) {
         logMessage(
-          `❌ Device failed RSSI check: ${rssiError instanceof Error ? rssiError.message : String(rssiError)}`
+          `❌ Device failed RSSI check: ${
+            rssiError instanceof Error ? rssiError.message : String(rssiError)
+          }`
         );
         return false;
       }
     } catch (error) {
       logMessage(
-        `❌ Error verifying connection: ${error instanceof Error ? error.message : String(error)}`
+        `❌ Error verifying connection: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
       return false;
     }
@@ -539,19 +571,52 @@ export const useBleConnection = (options?: {
       const deviceJson = await AsyncStorage.getItem(REMEMBERED_DEVICE_KEY);
 
       if (deviceJson) {
-        const device = JSON.parse(deviceJson);
-        setRememberedDevice(device);
+        const remembered = JSON.parse(deviceJson);
+        setRememberedDevice(remembered);
         logMessage(
-          `✅ Remembered device found: ${device.name || "Unnamed device"} (${device.id})`
+          `✅ Remembered device found: ${
+            remembered.name || "Unnamed device"
+          } (${remembered.id})`
         );
-        return device;
+
+        // Scan for devices to get the full object
+        logMessage(
+          "🔍 Scanning for available devices to match remembered ID..."
+        );
+        await BleManager.scan([], 3, true);
+        await new Promise((res) => setTimeout(res, 3500)); // Wait for scan to complete
+        const foundDevices = await BleManager.getDiscoveredPeripherals();
+        const matched = foundDevices.find((d) => d.id === remembered.id);
+
+        if (matched) {
+          logMessage(
+            `✅ Matched remembered device in scan: ${
+              matched.name || "Unnamed device"
+            }`
+          );
+          setRememberedDevice({
+            id: matched.id,
+            name: matched.name ?? null,
+            rssi: matched.rssi,
+          });
+          await connectToDevice({
+            id: matched.id,
+            name: matched.name ?? null,
+            rssi: matched.rssi,
+          }); // Use the full device object
+        } else {
+          logMessage("❌ Remembered device not found in current scan.");
+        }
+        return matched || remembered;
       } else {
         logMessage("ℹ️ No remembered device found");
         return null;
       }
     } catch (error) {
       logMessage(
-        `❌ Failed to load remembered device: ${error instanceof Error ? error.message : String(error)}`
+        `❌ Failed to load remembered device: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
       return null;
     }
@@ -610,10 +675,12 @@ export const useBleConnection = (options?: {
       return true;
     } catch (error) {
       logMessage(
-        `❌ Error initializing OBD for remembered device: ${error instanceof Error ? error.message : String(error)}`
+        `❌ Error initializing OBD for remembered device: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
       return false;
-    } 
+    }
   };
 
   // Save device for later use
@@ -622,11 +689,15 @@ export const useBleConnection = (options?: {
       await AsyncStorage.setItem(REMEMBERED_DEVICE_KEY, JSON.stringify(device));
       setRememberedDevice(device);
       logMessage(
-        `💾 Device saved for future connections: ${device.name || "Unnamed device"}`
+        `💾 Device saved for future connections: ${
+          device.name || "Unnamed device"
+        }`
       );
     } catch (error) {
       logMessage(
-        `❌ Failed to save device: ${error instanceof Error ? error.message : String(error)}`
+        `❌ Failed to save device: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
     }
   };
@@ -639,7 +710,9 @@ export const useBleConnection = (options?: {
       logMessage("🗑️ Remembered device has been forgotten");
     } catch (error) {
       logMessage(
-        `❌ Failed to forget device: ${error instanceof Error ? error.message : String(error)}`
+        `❌ Failed to forget device: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
     }
   };
@@ -698,7 +771,9 @@ export const useBleConnection = (options?: {
       }
     } catch (error) {
       logMessage(
-        `❌ Error requesting permissions: ${error instanceof Error ? error.message : String(error)}`
+        `❌ Error requesting permissions: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
       return false;
     }
@@ -778,7 +853,9 @@ export const useBleConnection = (options?: {
         });
       } catch (err) {
         logMessage(
-          `❌ Error getting connected devices: ${err instanceof Error ? err.message : String(err)}`
+          `❌ Error getting connected devices: ${
+            err instanceof Error ? err.message : String(err)
+          }`
         );
       }
 
@@ -798,7 +875,9 @@ export const useBleConnection = (options?: {
               `🔍 Total devices discovered by BleManager: ${discoveredFromManager.length}`
             );
             logMessage(
-              `📱 Named devices: ${namedDevices.length}, Unnamed devices: ${discoveredFromManager.length - namedDevices.length}`
+              `📱 Named devices: ${namedDevices.length}, Unnamed devices: ${
+                discoveredFromManager.length - namedDevices.length
+              }`
             );
 
             // Update the state with named devices directly from the manager
@@ -822,12 +901,16 @@ export const useBleConnection = (options?: {
             }
           } catch (err) {
             logMessage(
-              `❌ Error getting discovered devices: ${err instanceof Error ? err.message : String(err)}`
+              `❌ Error getting discovered devices: ${
+                err instanceof Error ? err.message : String(err)
+              }`
             );
           }
         } catch (err) {
           logMessage(
-            `❌ Error stopping scan: ${err instanceof Error ? err.message : String(err)}`
+            `❌ Error stopping scan: ${
+              err instanceof Error ? err.message : String(err)
+            }`
           );
         }
 
@@ -837,11 +920,12 @@ export const useBleConnection = (options?: {
     } catch (err) {
       setIsScanning(false);
       logMessage(
-        `❌ Error during scan: ${err instanceof Error ? err.message : String(err)}`
+        `❌ Error during scan: ${
+          err instanceof Error ? err.message : String(err)
+        }`
       );
     }
   };
-
 
   // Discover device characteristics
   const discoverDeviceProfile = async (
@@ -869,7 +953,9 @@ export const useBleConnection = (options?: {
         } catch (error) {
           retryCount--;
           logMessage(
-            `Failed to get services: ${error instanceof Error ? error.message : String(error)}`
+            `Failed to get services: ${
+              error instanceof Error ? error.message : String(error)
+            }`
           );
           if (retryCount > 0) {
             logMessage(`Waiting before retry...`);
@@ -959,12 +1045,13 @@ export const useBleConnection = (options?: {
       }
     } catch (error) {
       logMessage(
-        `❌ Error in device profile discovery: ${error instanceof Error ? error.message : String(error)}`
+        `❌ Error in device profile discovery: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
       return false;
     }
   };
-
 
   // Initialize OBD device
   const initializeOBD = async (
@@ -1019,7 +1106,9 @@ export const useBleConnection = (options?: {
       return true;
     } catch (error) {
       logMessage(
-        `❌ OBD initialization failed: ${error instanceof Error ? error.message : String(error)}`
+        `❌ OBD initialization failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
       return false;
     }
@@ -1064,7 +1153,9 @@ export const useBleConnection = (options?: {
       return null;
     } catch (error) {
       logMessage(
-        `❌ Error getting PLX device: ${error instanceof Error ? error.message : String(error)}`
+        `❌ Error getting PLX device: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
       return null;
     }
@@ -1311,7 +1402,6 @@ export const useBleConnection = (options?: {
 
     // Setters for discoveredDevices if needed externally
     setDiscoveredDevices,
-    connectToBondedDeviceIfAvailable,
-
+  //   connectToBondedDeviceIfAvailable,
   };
 };

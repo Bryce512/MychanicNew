@@ -26,9 +26,62 @@ import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityI
 import { pidCommands } from "../services/pidCommands";
 import BluetoothDeviceSelector from "../components/BluetoothDeviceSelector";
 import { useBluetooth } from "../contexts/BluetoothContext";
+import { useEffect as useReactEffect, useState as useReactState } from "react";
+import firebaseService from "../services/firebaseService";
 import BleManager from "react-native-ble-manager";
 
 const ScanDevicesScreen = () => {
+  // Wrapper to support passing vehicleId to context connectToDevice
+  function connectToDeviceWithVehicle(device: any, vehicleId: string | null) {
+    // @ts-ignore
+    if (typeof connectToDevice === 'function' && connectToDevice.length > 1) {
+      // Our patched context version
+      return connectToDevice(device);
+    } else {
+      // Fallback for original signature
+      return connectToDevice(device);
+    }
+  }
+
+  // Vehicle selection state
+  const [vehicles, setVehicles] = useReactState<any[]>([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useReactState<string | null>(null);
+  // Fetch vehicles for dropdown
+  useReactEffect(() => {
+    const fetchVehicles = async () => {
+      const user = firebaseService.getCurrentUser();
+      if (user) {
+        const userVehicles = await firebaseService.getVehicles(user.uid);
+        setVehicles(userVehicles || []);
+        if (userVehicles && userVehicles.length > 0 && !selectedVehicleId) {
+          setSelectedVehicleId(userVehicles[0].id);
+        }
+      }
+    };
+    fetchVehicles();
+  }, []);
+  // Vehicle selector dropdown UI
+  const renderVehicleDropdown = () => (
+    <View style={{ margin: 16 }}>
+      <Text variant="titleSmall">Select Vehicle</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginTop: 8 }}>
+        {vehicles.map((vehicle) => (
+          <TouchableOpacity
+            key={vehicle.id}
+            style={{
+              padding: 10,
+              backgroundColor: selectedVehicleId === vehicle.id ? theme.colors.primary : '#eee',
+              borderRadius: 8,
+              marginRight: 8,
+            }}
+            onPress={() => setSelectedVehicleId(vehicle.id)}
+          >
+            <Text style={{ color: selectedVehicleId === vehicle.id ? '#fff' : '#333' }}>{vehicle.name}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
   const theme = useTheme();
   const navigation = useNavigation();
   const {
@@ -238,6 +291,7 @@ const ScanDevicesScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {renderVehicleDropdown()}
       <Surface style={styles.header}>
         <IconButton
           icon="arrow-left"
@@ -377,15 +431,15 @@ const ScanDevicesScreen = () => {
         </Card>
       )}
 
-      {/* Import the device selector component */}
-      <BluetoothDeviceSelector
-        visible={showDeviceSelector}
-        onClose={() => setShowDeviceSelector(false)}
-        devices={discoveredDevices}
-        onSelectDevice={connectToDevice}
-        isScanning={isScanning}
-        onScanAgain={startScan}
-      />
+  {/* Import the device selector component */}
+  <BluetoothDeviceSelector
+    visible={showDeviceSelector}
+    onClose={() => setShowDeviceSelector(false)}
+    devices={discoveredDevices}
+    onSelectDevice={(device) => connectToDeviceWithVehicle(device, selectedVehicleId)}
+    isScanning={isScanning}
+    onScanAgain={startScan}
+  />
 
       {/* Connection Status button */}
       <TouchableOpacity

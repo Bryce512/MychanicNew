@@ -1,26 +1,85 @@
+import storage from '@react-native-firebase/storage';
+// Upload vehicle image to Firebase Storage and return the download URL
+export const uploadVehicleImage = async (
+  userId: string,
+  vehicleId: string,
+  uri: string,
+  ext: string = "jpg"
+) => {
+  try {
+    const path = `user_uploads/${userId}/${vehicleId}.${ext}`;
+    const ref = storage().ref(path);
+    // Upload file from local uri
+    await ref.putFile(uri);
+    // Get download URL
+    const url = await ref.getDownloadURL();
+    return url;
+  } catch (error) {
+    console.error("Error uploading vehicle image:", error);
+    throw error;
+  }
+};
+// Update diagInfo for a specific vehicle
+export const updateVehicleDiagInfo = async (
+  userId: string,
+  vehicleId: string,
+  diagData: any
+) => {
+  const database = getDatabase();
+  const diagInfoRef = ref(
+    database,
+    `users/${userId}/vehicles/${vehicleId}/diagnosticData`
+  );
+  try {
+    // If mileage is present, update lastMileageUpdate
+    let dataToSet = { ...diagData };
+    if (typeof diagData.mileage !== 'undefined') {
+      dataToSet.lastMileageUpdate = Date.now();
+    }
+    await set(diagInfoRef, dataToSet);
+    return true;
+  } catch (error) {
+    console.error("Error updating diagInfo:", error);
+    throw error;
+  }
+};
+// Fetch diagInfo for a specific vehicle
+export const getVehicleDiagInfo = async (userId: string, vehicleId: string) => {
+  const database = getDatabase();
+  const diagInfoRef = ref(
+    database,
+    `users/${userId}/vehicles/${vehicleId}/diagnosticData`
+  );
+  try {
+    const snapshot = await get(diagInfoRef);
+    if (snapshot.exists()) {
+      return snapshot.val();
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching diagInfo:", error);
+    return null;
+  }
+};
 // firebaseService.ts
-import { 
-  initializeApp, 
-  getApp, 
-  getApps 
-} from '@react-native-firebase/app';
-import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
+import { initializeApp, getApp, getApps } from "@react-native-firebase/app";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut as authSignOut,
-  onAuthStateChanged
-} from '@react-native-firebase/auth';
-import { 
-  getDatabase, 
-  ref, 
-  set, 
+  onAuthStateChanged,
+} from "@react-native-firebase/auth";
+import {
+  getDatabase,
+  ref,
+  set,
   get,
   update,
   remove,
   push,
-} from '@react-native-firebase/database';
-import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
+} from "@react-native-firebase/database";
+import type { FirebaseAuthTypes } from "@react-native-firebase/auth";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -30,7 +89,7 @@ const firebaseConfig = {
   projectId: "fluid-tangent-405719",
   storageBucket: "fluid-tangent-405719.firebasestorage.app",
   messagingSenderId: "578434461817",
-  appId: "1:578434461817:ios:5509bcf8e73151e2c524a8"
+  appId: "1:578434461817:ios:5509bcf8e73151e2c524a8",
 };
 
 // Flag to track initialization status
@@ -65,7 +124,7 @@ export const initializeFirebase = async () => {
 export const writeData = (userId: string, name: string, email: string) => {
   const database = getDatabase();
   const userRef = ref(database, `users/${userId}`);
-  
+
   const userData = {
     name: name,
     email: email,
@@ -80,7 +139,7 @@ export const writeData = (userId: string, name: string, email: string) => {
 export const readData = (userId: string) => {
   const database = getDatabase();
   const userRef = ref(database, `users/${userId}`);
-  
+
   return get(userRef)
     .then((snapshot) => {
       if (snapshot.exists()) {
@@ -103,43 +162,56 @@ export const signIn = async (email: string, password: string) => {
   try {
     // Basic validation before attempting sign in
     if (!email || !email.trim()) {
-      return { user: null, error: { code: 'auth/empty-email', message: 'Email cannot be empty' } };
+      return {
+        user: null,
+        error: { code: "auth/empty-email", message: "Email cannot be empty" },
+      };
     }
-    
+
     if (!password || password.length < 6) {
-      return { user: null, error: { code: 'auth/weak-password', message: 'Password must be at least 6 characters' } };
+      return {
+        user: null,
+        error: {
+          code: "auth/weak-password",
+          message: "Password must be at least 6 characters",
+        },
+      };
     }
-    
+
     // Use React Native Firebase auth
     const auth = getAuth();
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
     // Add this line to ensure user exists in database
     await ensureUserProfile(userCredential.user);
-    
+
     return { user: userCredential.user, error: null };
   } catch (error: any) {
     // Provide more specific error messages based on Firebase error codes
     console.error("Firebase authentication error:", error.code, error.message);
-    
-    let errorMessage = 'Failed to sign in';
-    if (error.code === 'auth/user-not-found') {
-      errorMessage = 'No account exists with this email';
-    } else if (error.code === 'auth/wrong-password') {
-      errorMessage = 'Incorrect password';
-    } else if (error.code === 'auth/invalid-email') {
-      errorMessage = 'Invalid email format';
-    } else if (error.code === 'auth/too-many-requests') {
-      errorMessage = 'Too many failed login attempts. Please try again later';
+
+    let errorMessage = "Failed to sign in";
+    if (error.code === "auth/user-not-found") {
+      errorMessage = "No account exists with this email";
+    } else if (error.code === "auth/wrong-password") {
+      errorMessage = "Incorrect password";
+    } else if (error.code === "auth/invalid-email") {
+      errorMessage = "Invalid email format";
+    } else if (error.code === "auth/too-many-requests") {
+      errorMessage = "Too many failed login attempts. Please try again later";
     }
-    
-    return { 
-      user: null, 
+
+    return {
+      user: null,
       error: {
-        code: error.code || 'auth/unknown',
+        code: error.code || "auth/unknown",
         message: errorMessage,
-        originalError: error 
-      }
+        originalError: error,
+      },
     };
   }
 };
@@ -147,11 +219,15 @@ export const signIn = async (email: string, password: string) => {
 export const signUp = async (email: string, password: string) => {
   try {
     const auth = getAuth();
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
     // Add this line to create user profile in database
     await ensureUserProfile(userCredential.user);
-    
+
     return { user: userCredential.user, error: null };
   } catch (error) {
     return { user: null, error };
@@ -168,7 +244,9 @@ export const getCurrentUser = () => {
   return auth.currentUser;
 };
 
-export const onAuthChange = (callback: (user: FirebaseAuthTypes.User | null) => void) => {
+export const onAuthChange = (
+  callback: (user: FirebaseAuthTypes.User | null) => void
+) => {
   const auth = getAuth();
   return onAuthStateChanged(auth, callback);
 };
@@ -177,15 +255,15 @@ export const onAuthChange = (callback: (user: FirebaseAuthTypes.User | null) => 
 export const getVehicles = async (userId: string) => {
   const database = getDatabase();
   const vehiclesRef = ref(database, `users/${userId}/vehicles`);
-  
+
   try {
     const snapshot = await get(vehiclesRef);
     if (snapshot.exists()) {
       const vehiclesData = snapshot.val();
       // Convert object to array with id included
-      return Object.keys(vehiclesData).map(key => ({
+      return Object.keys(vehiclesData).map((key) => ({
         id: key,
-        ...vehiclesData[key]
+        ...vehiclesData[key],
       }));
     }
     return [];
@@ -198,10 +276,10 @@ export const getVehicles = async (userId: string) => {
 export const addVehicle = async (userId: string, vehicleData: any) => {
   const database = getDatabase();
   const vehiclesRef = ref(database, `users/${userId}/vehicles`);
-  
+
   // Create a new unique key for the vehicle
   const newVehicleRef = push(vehiclesRef);
-  
+
   try {
     await set(newVehicleRef, vehicleData);
     return { id: newVehicleRef.key, ...vehicleData };
@@ -211,10 +289,14 @@ export const addVehicle = async (userId: string, vehicleData: any) => {
   }
 };
 
-export const updateVehicle = async (userId: string, vehicleId: string, vehicleData: any) => {
+export const updateVehicle = async (
+  userId: string,
+  vehicleId: string,
+  vehicleData: any
+) => {
   const database = getDatabase();
   const vehicleRef = ref(database, `users/${userId}/vehicles/${vehicleId}`);
-  
+
   try {
     await update(vehicleRef, vehicleData);
     return { id: vehicleId, ...vehicleData };
@@ -227,7 +309,7 @@ export const updateVehicle = async (userId: string, vehicleId: string, vehicleDa
 export const deleteVehicle = async (userId: string, vehicleId: string) => {
   const database = getDatabase();
   const vehicleRef = ref(database, `users/${userId}/vehicles/${vehicleId}`);
-  
+
   try {
     await remove(vehicleRef);
     return true;
@@ -241,17 +323,17 @@ export const deleteVehicle = async (userId: string, vehicleId: string) => {
 export const getDiagnosticLogs = async (userId: string, vehicleId: string) => {
   const database = getDatabase();
   const logsRef = ref(database, `users/${userId}/diagnostic_logs`);
-  
+
   try {
     const snapshot = await get(logsRef);
     if (snapshot.exists()) {
       const logsData = snapshot.val();
       // Filter logs for the specific vehicle and convert to array
       return Object.keys(logsData)
-        .filter(key => logsData[key].vehicleId === vehicleId)
-        .map(key => ({
+        .filter((key) => logsData[key].vehicleId === vehicleId)
+        .map((key) => ({
           id: key,
-          ...logsData[key]
+          ...logsData[key],
         }));
     }
     return [];
@@ -264,32 +346,32 @@ export const getDiagnosticLogs = async (userId: string, vehicleId: string) => {
 // Creates a user profile in the database if it doesn't already exist
 export const ensureUserProfile = async (user: FirebaseAuthTypes.User) => {
   if (!user) return null;
-  
+
   const database = getDatabase();
   const userRef = ref(database, `users/${user.uid}`);
-  
+
   try {
     // Check if user profile already exists
     const snapshot = await get(userRef);
-    
+
     if (!snapshot.exists()) {
       // Create new user profile
       const userData = {
         profile: {
-          name: user.displayName || '',
-          email: user.email || '',
-          phone: user.phoneNumber || '',
+          name: user.displayName || "",
+          email: user.email || "",
+          phone: user.phoneNumber || "",
         },
         vehicles: {},
         diagnostic_logs: {},
-        maintenance_records: {}
+        maintenance_records: {},
       };
-      
+
       await set(userRef, userData);
       console.log("Created new user profile in database");
       return userData;
     }
-    
+
     return snapshot.val();
   } catch (error) {
     console.error("Error ensuring user profile:", error);
@@ -312,4 +394,7 @@ export default {
   deleteVehicle,
   getDiagnosticLogs,
   ensureUserProfile,
+  getVehicleDiagInfo,
+  updateVehicleDiagInfo,
+  uploadVehicleImage,
 };

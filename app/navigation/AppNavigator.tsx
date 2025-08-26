@@ -11,6 +11,7 @@ import FindMechanicsScreen from "../screens/FindMechanics";
 // import MechanicProfileScreen from '../screens/MechanicProfile'
 // import AppointmentsScreen from '../screens/Appointment'
 import VehicleProfilesScreen from "../screens/VehicleProfiles";
+import ProfileScreen from "../screens/Profile";
 // // import VehicleDetailScreen from '../screens/VehicleDetailScreen'
 import BookAppointmentScreen from "../screens/BookAppointment";
 import LoginScreen from "../screens/Login";
@@ -42,6 +43,8 @@ export type RootStackParamList = {
   };
   ScanDevices: undefined;
   AddVehicle: undefined;
+  Profile: undefined;
+  EditVehicleInfo: { vehicle: any; userId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -73,6 +76,16 @@ function MainTabs() {
         }}
       />
       <Tab.Screen
+        name="Vehicles"
+        component={VehicleProfilesScreen}
+        options={{
+          title: "My Vehicles",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="truck" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="FindMechanics"
         component={FindMechanicsScreen}
         options={{
@@ -89,16 +102,6 @@ function MainTabs() {
           tabBarIcon: ({ color, size }) => <Feather name='calendar' size={size} color={color} />,
         }}
       /> */}
-      <Tab.Screen
-        name="Vehicles"
-        component={VehicleProfilesScreen}
-        options={{
-          title: "My Vehicles",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="truck" size={size} color={color} />
-          ),
-        }}
-      />
     </Tab.Navigator>
   );
 }
@@ -145,6 +148,16 @@ export default function AppNavigator() {
             name="AddVehicle"
             component={AddVehicleScreen}
             options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{ headerShown: true, title: "Profile" }}
+          />
+          <Stack.Screen
+            name="EditVehicleInfo"
+            component={require("../screens/EditVehicleInfo").default}
+            options={{ headerShown: true, title: "Edit Vehicle Info" }}
           />
         </>
       ) : (

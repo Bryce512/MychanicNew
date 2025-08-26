@@ -74,6 +74,7 @@ class BluetoothManager {
 
   async connectToDevice(): Promise<void> {
     if (!this.deviceId) throw new Error("No device selected");
+    await BleManager.disconnect(this.deviceId);
 
     await BleManager.connect(this.deviceId);
     console.log(`Connected to device ${this.deviceId}`);
@@ -115,6 +116,35 @@ class BluetoothManager {
     const hex = bytesToHex(data);
     console.log("Received data:", hex);
     return hex;
+  }
+
+  async connectToRememberedDevice(): Promise<boolean> {
+    if (!this.deviceId) {
+      console.log("ℹ️ No remembered device found");
+      return false;
+    }
+
+    try {
+      await this.connectToDevice();
+      console.log(`Connected to device ${this.deviceId}`);
+
+      await BleManager.retrieveServices(this.deviceId);
+      console.log("Services retrieved");
+
+      // Only set state after full success
+      return true;
+    } catch (error) {
+      console.log(
+        `❌ Error connecting/initializing OBD for remembered device: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      // Reset all BLE state
+      this.deviceId = null;
+      // Add a delay to avoid rapid reconnect loops
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      return false;
+    }
   }
 }
 
