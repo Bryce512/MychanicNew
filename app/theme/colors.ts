@@ -1,15 +1,27 @@
 export const colors = {
   primary: {
-    50: "#e6f1fe",
-    100: "#cce3fd",
-    200: "#99c7fb",
-    300: "#66aaf9",
-    400: "#338ef7",
-    500: "#0072f5", // Main primary color
-    600: "#005bc4",
-    700: "#004493",
-    800: "#002e62",
-    900: "#001731",
+    50: "#e8eef4",
+    100: "#c5d1e0",
+    200: "#9bb2c9",
+    300: "#6a8da9",
+    400: "#3d6685",
+    500: "#003566", // Prussian Blue (main primary)
+    600: "#002f5a",
+    700: "#00274b",
+    800: "#001f3c",
+    900: "#001D3D", // Oxford Blue (darkest)
+  },
+  accent: {
+    50: "#fff9e6",
+    100: "#fff0b3",
+    200: "#ffe680",
+    300: "#ffdb4d",
+    400: "#ffd11a",
+    500: "#FFC300", // Mikado Yellow
+    600: "#e6af00",
+    700: "#cc9c00",
+    800: "#b38900",
+    900: "#FFD60A", // Gold Web Golden
   },
   gray: {
     50: "#f9fafb",
@@ -24,7 +36,7 @@ export const colors = {
     900: "#111827",
   },
   white: "#ffffff",
-  black: "#000000",
+  black: "#000814",
   red: {
     500: "#ef4444",
   },
@@ -34,5 +46,4 @@ export const colors = {
   yellow: {
     500: "#f59e0b",
   },
-}
-
+};

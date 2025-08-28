@@ -1,13 +1,23 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image, useColorScheme } from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
-import { useNavigation } from "@react-navigation/native"
-import { Feather } from "@expo/vector-icons"
-import Button from "../components/Button"
-import Card, { CardContent } from "../components/Card"
-import { colors } from "../theme/colors"
+import { useState } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  useColorScheme,
+  StatusBar,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import { Feather } from "@expo/vector-icons";
+import Button from "../components/Button";
+import Card, { CardContent } from "../components/Card";
+import { styles } from "../theme/styles/FindMechanics.styles";
+import { colors } from "../theme/colors";
 
 // Mock data
 const mechanicData = [
@@ -56,26 +66,31 @@ const mechanicData = [
     startingPrice: 59,
     estimatedTime: "Est. time: 2-4 hours",
   },
-]
+];
 
 export default function FindMechanicsScreen() {
-  const navigation = useNavigation()
-  const colorScheme = useColorScheme()
-  const isDark = colorScheme === "dark"
+  const navigation = useNavigation();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
 
-  const [searchQuery, setSearchQuery] = useState("")
-  const [locationQuery, setLocationQuery] = useState("")
-  const [activeTab, setActiveTab] = useState("list")
+  const [searchQuery, setSearchQuery] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("list");
 
-  const renderMechanicCard = ({ item }: { item: typeof mechanicData[0] }) => <MechanicCard mechanic={item} isDark={isDark} />
+  const renderMechanicCard = ({ item }: { item: (typeof mechanicData)[0] }) => (
+    <MechanicCard mechanic={item} isDark={isDark} />
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={[styles.title, isDark && styles.textLight]}>Find Mechanics</Text>
+          <Text style={[styles.title, isDark && styles.textLight]}>
+            Find Mechanics
+          </Text>
           <Text style={[styles.subtitle, isDark && styles.textMutedLight]}>
-            Search for trusted mechanics in your area with transparent pricing and verified reviews.
+            Search for trusted mechanics in your area with transparent pricing
+            and verified reviews.
           </Text>
 
           <View style={styles.searchContainer}>
@@ -87,9 +102,15 @@ export default function FindMechanicsScreen() {
                 style={styles.inputIcon}
               />
               <TextInput
-                style={[styles.input, isDark && styles.inputDark, { paddingLeft: 36 }]}
+                style={[
+                  styles.input,
+                  isDark && styles.inputDark,
+                  { paddingLeft: 36 },
+                ]}
                 placeholder="Search for services or shops..."
-                placeholderTextColor={isDark ? colors.gray[400] : colors.gray[500]}
+                placeholderTextColor={
+                  isDark ? colors.gray[400] : colors.gray[500]
+                }
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
@@ -103,29 +124,55 @@ export default function FindMechanicsScreen() {
                 style={styles.inputIcon}
               />
               <TextInput
-                style={[styles.input, isDark && styles.inputDark, { paddingLeft: 36 }]}
+                style={[
+                  styles.input,
+                  isDark && styles.inputDark,
+                  { paddingLeft: 36 },
+                ]}
                 placeholder="Zip Code or Location"
-                placeholderTextColor={isDark ? colors.gray[400] : colors.gray[500]}
+                placeholderTextColor={
+                  isDark ? colors.gray[400] : colors.gray[500]
+                }
                 value={locationQuery}
                 onChangeText={setLocationQuery}
               />
             </View>
 
-            <Button title="Search" onPress={() => {}} style={styles.searchButton} />
+            <Button
+              title="Search"
+              onPress={() => {}}
+              style={styles.searchButton}
+            />
           </View>
         </View>
 
         <View style={styles.filtersRow}>
-          <TouchableOpacity style={[styles.filterButton, isDark && styles.filterButtonDark]}>
-            <Feather name="filter" size={14} color={isDark ? colors.white : colors.gray[900]} />
-            <Text style={[styles.filterButtonText, isDark && styles.textLight]}>Filters</Text>
+          <TouchableOpacity
+            style={[styles.filterButton, isDark && styles.filterButtonDark]}
+          >
+            <Feather
+              name="filter"
+              size={14}
+              color={isDark ? colors.white : colors.gray[900]}
+            />
+            <Text style={[styles.filterButtonText, isDark && styles.textLight]}>
+              Filters
+            </Text>
           </TouchableOpacity>
 
           <View style={styles.sortContainer}>
-            <Text style={[styles.sortLabel, isDark && styles.textMutedLight]}>Sort by:</Text>
+            <Text style={[styles.sortLabel, isDark && styles.textMutedLight]}>
+              Sort by:
+            </Text>
             <TouchableOpacity style={styles.sortButton}>
-              <Text style={[styles.sortButtonText, isDark && styles.textLight]}>Recommended</Text>
-              <Feather name="chevron-down" size={16} color={isDark ? colors.white : colors.gray[900]} />
+              <Text style={[styles.sortButtonText, isDark && styles.textLight]}>
+                Recommended
+              </Text>
+              <Feather
+                name="chevron-down"
+                size={16}
+                color={isDark ? colors.white : colors.gray[900]}
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -176,12 +223,18 @@ export default function FindMechanicsScreen() {
           {activeTab === "list" ? (
             <View style={styles.mechanicsContainer}>
               {mechanicData.map((mechanic) => (
-                <MechanicCard key={mechanic.id} mechanic={mechanic} isDark={isDark} />
+                <MechanicCard
+                  key={mechanic.id}
+                  mechanic={mechanic}
+                  isDark={isDark}
+                />
               ))}
             </View>
           ) : (
             <View style={styles.mapContainer}>
-              <Text style={[styles.mapPlaceholder, isDark && styles.textMutedLight]}>
+              <Text
+                style={[styles.mapPlaceholder, isDark && styles.textMutedLight]}
+              >
                 Interactive map would be displayed here
               </Text>
             </View>
@@ -189,24 +242,55 @@ export default function FindMechanicsScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
-  )
+  );
+  // StatusBar for all screens except Home
+  // (If you want to use a specific color, set backgroundColor)
+  // Transparent keeps it overlayed on the header
+  // Place at the top of the component
+  // You can move this to after hooks if you prefer
+  return (
+    <>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" />
+      {/* ...existing code... */}
+    </>
+  );
 }
 
-function MechanicCard({ mechanic, isDark }) {
-  const navigation = useNavigation()
+type Mechanic = (typeof mechanicData)[0];
+
+function MechanicCard({
+  mechanic,
+  isDark,
+}: {
+  mechanic: Mechanic;
+  isDark: boolean;
+}) {
+  const navigation = useNavigation();
 
   return (
     <Card style={styles.mechanicCard}>
       <CardContent style={styles.mechanicCardContent}>
-        <Image source={{ uri: mechanic.image }} style={styles.mechanicImage} resizeMode="cover" />
+        <Image
+          source={{ uri: mechanic.image }}
+          style={styles.mechanicImage}
+          resizeMode="cover"
+        />
 
         <View style={styles.mechanicInfo}>
           <View style={styles.mechanicHeader}>
             <View>
-              <Text style={[styles.mechanicName, isDark && styles.textLight]}>{mechanic.name}</Text>
+              <Text style={[styles.mechanicName, isDark && styles.textLight]}>
+                {mechanic.name}
+              </Text>
               <View style={styles.locationContainer}>
-                <Feather name="map-pin" size={12} color={isDark ? colors.gray[400] : colors.gray[500]} />
-                <Text style={[styles.locationText, isDark && styles.textMutedLight]}>
+                <Feather
+                  name="map-pin"
+                  size={12}
+                  color={isDark ? colors.gray[400] : colors.gray[500]}
+                />
+                <Text
+                  style={[styles.locationText, isDark && styles.textMutedLight]}
+                >
                   {mechanic.location} • {mechanic.distance} miles away
                 </Text>
               </View>
@@ -215,7 +299,9 @@ function MechanicCard({ mechanic, isDark }) {
             <View
               style={[
                 styles.availabilityBadge,
-                mechanic.availability === "Available Today" ? styles.availabilityToday : styles.availabilityTomorrow,
+                mechanic.availability === "Available Today"
+                  ? styles.availabilityToday
+                  : styles.availabilityTomorrow,
                 isDark && styles.availabilityBadgeDark,
               ]}
             >
@@ -240,32 +326,60 @@ function MechanicCard({ mechanic, isDark }) {
                   key={i}
                   name="star"
                   size={14}
-                  color={i < Math.floor(mechanic.rating) ? colors.primary[500] : colors.gray[300]}
-                  style={i < Math.floor(mechanic.rating) && { fill: colors.primary[500] }}
+                  color={
+                    i < Math.floor(mechanic.rating)
+                      ? colors.primary[500]
+                      : colors.gray[300]
+                  }
                 />
               ))}
             </View>
-            <Text style={[styles.ratingText, isDark && styles.textLight]}>{mechanic.rating.toFixed(1)}</Text>
-            <Text style={[styles.reviewCount, isDark && styles.textMutedLight]}>({mechanic.reviewCount} reviews)</Text>
+            <Text style={[styles.ratingText, isDark && styles.textLight]}>
+              {mechanic.rating.toFixed(1)}
+            </Text>
+            <Text style={[styles.reviewCount, isDark && styles.textMutedLight]}>
+              ({mechanic.reviewCount} reviews)
+            </Text>
           </View>
 
           <View style={styles.servicesContainer}>
             {mechanic.services.map((service, index) => (
-              <View key={index} style={[styles.serviceBadge, isDark && styles.serviceBadgeDark]}>
-                <Text style={[styles.serviceText, isDark && styles.textLight]}>{service}</Text>
+              <View
+                key={index}
+                style={[styles.serviceBadge, isDark && styles.serviceBadgeDark]}
+              >
+                <Text style={[styles.serviceText, isDark && styles.textLight]}>
+                  {service}
+                </Text>
               </View>
             ))}
           </View>
 
           <View style={styles.detailsContainer}>
             <View style={styles.detailItem}>
-              <Feather name="dollar-sign" size={14} color={isDark ? colors.gray[400] : colors.gray[500]} />
-              <Text style={[styles.detailText, isDark && styles.textMutedLight]}>{mechanic.pricingTransparency}</Text>
+              <Feather
+                name="dollar-sign"
+                size={14}
+                color={isDark ? colors.gray[400] : colors.gray[500]}
+              />
+              <Text
+                style={[styles.detailText, isDark && styles.textMutedLight]}
+              >
+                {mechanic.pricingTransparency}
+              </Text>
             </View>
 
             <View style={styles.detailItem}>
-              <Feather name="check-circle" size={14} color={isDark ? colors.gray[400] : colors.gray[500]} />
-              <Text style={[styles.detailText, isDark && styles.textMutedLight]}>{mechanic.certification}</Text>
+              <Feather
+                name="check-circle"
+                size={14}
+                color={isDark ? colors.gray[400] : colors.gray[500]}
+              />
+              <Text
+                style={[styles.detailText, isDark && styles.textMutedLight]}
+              >
+                {mechanic.certification}
+              </Text>
             </View>
           </View>
 
@@ -276,292 +390,13 @@ function MechanicCard({ mechanic, isDark }) {
 
             <Button
               title="View Profile"
-              onPress={() => navigation.navigate("MechanicProfile", { id: mechanic.id })}
+              onPress={() => {}}
+              // onPress={() => navigation.navigate("MechanicProfile", { id: mechanic.id })}
               size="sm"
             />
           </View>
         </View>
       </CardContent>
     </Card>
-  )
+  );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 8,
-    color: colors.gray[900],
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.gray[600],
-    marginBottom: 16,
-  },
-  searchContainer: {
-    gap: 12,
-  },
-  inputContainer: {
-    position: "relative",
-  },
-  inputIcon: {
-    position: "absolute",
-    left: 12,
-    top: 12,
-    zIndex: 1,
-  },
-  input: {
-    height: 44,
-    borderWidth: 1,
-    borderColor: colors.gray[300],
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    backgroundColor: colors.white,
-  },
-  inputDark: {
-    borderColor: colors.gray[700],
-    backgroundColor: colors.gray[800],
-    color: colors.white,
-  },
-  searchButton: {
-    height: 44,
-  },
-  filtersRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  filterButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: colors.gray[300],
-    backgroundColor: colors.white,
-    gap: 6,
-  },
-  filterButtonDark: {
-    borderColor: colors.gray[700],
-    backgroundColor: colors.gray[800],
-  },
-  filterButtonText: {
-    fontSize: 14,
-    color: colors.gray[900],
-  },
-  sortContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  sortLabel: {
-    fontSize: 14,
-    color: colors.gray[600],
-  },
-  sortButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  sortButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: colors.gray[900],
-  },
-  tabsContainer: {
-    paddingHorizontal: 20,
-  },
-  tabsHeader: {
-    flexDirection: "row",
-    marginBottom: 16,
-    borderRadius: 8,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: colors.gray[300],
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    backgroundColor: colors.white,
-  },
-  tabButtonDark: {
-    backgroundColor: colors.gray[800],
-    borderColor: colors.gray[700],
-  },
-  activeTabButton: {
-    backgroundColor: colors.primary[500],
-  },
-  activeTabButtonDark: {
-    backgroundColor: colors.primary[600],
-  },
-  tabButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: colors.gray[900],
-  },
-  activeTabButtonText: {
-    color: colors.white,
-  },
-  mechanicsContainer: {
-    marginBottom: 20,
-  },
-  mapContainer: {
-    height: 300,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.gray[300],
-    backgroundColor: colors.gray[100],
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  mapPlaceholder: {
-    color: colors.gray[500],
-  },
-  mechanicCard: {
-    marginBottom: 16,
-  },
-  mechanicCardContent: {
-    padding: 0,
-  },
-  mechanicImage: {
-    width: "100%",
-    height: 150,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  mechanicInfo: {
-    padding: 16,
-  },
-  mechanicHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 8,
-  },
-  mechanicName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: colors.gray[900],
-    marginBottom: 4,
-  },
-  locationContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  locationText: {
-    fontSize: 12,
-    color: colors.gray[600],
-  },
-  availabilityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  availabilityToday: {
-    backgroundColor: colors.green[500] + "20", // 20% opacity
-  },
-  availabilityTomorrow: {
-    backgroundColor: colors.gray[200],
-  },
-  availabilityBadgeDark: {
-    backgroundColor: colors.gray[700],
-  },
-  availabilityText: {
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  availabilityTodayText: {
-    color: colors.green[500],
-  },
-  availabilityTomorrowText: {
-    color: colors.gray[700],
-  },
-  availabilityTextDark: {
-    color: colors.white,
-  },
-  ratingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-    gap: 4,
-  },
-  starsContainer: {
-    flexDirection: "row",
-    gap: 2,
-  },
-  ratingText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: colors.gray[900],
-    marginLeft: 4,
-  },
-  reviewCount: {
-    fontSize: 12,
-    color: colors.gray[600],
-  },
-  servicesContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 12,
-  },
-  serviceBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: colors.gray[300],
-    backgroundColor: colors.white,
-  },
-  serviceBadgeDark: {
-    borderColor: colors.gray[700],
-    backgroundColor: colors.gray[800],
-  },
-  serviceText: {
-    fontSize: 12,
-    color: colors.gray[900],
-  },
-  detailsContainer: {
-    gap: 8,
-    marginBottom: 12,
-  },
-  detailItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  detailText: {
-    fontSize: 14,
-    color: colors.gray[600],
-  },
-  mechanicFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  priceText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: colors.gray[900],
-  },
-  textLight: {
-    color: colors.white,
-  },
-  textMutedLight: {
-    color: colors.gray[400],
-  },
-})
-

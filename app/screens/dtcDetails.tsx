@@ -7,16 +7,21 @@ import {
   TouchableOpacity,
   Linking,
   ActivityIndicator,
+  StatusBar,
 } from "react-native";
-import { useNavigation, useRoute, NavigationProp, RouteProp } from "@react-navigation/native";
+import {
+  useNavigation,
+  useRoute,
+  NavigationProp,
+  RouteProp,
+} from "@react-navigation/native";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { Feather } from "@expo/vector-icons";
 import Card, { CardHeader, CardContent, CardFooter } from "../components/Card";
 import { useTheme } from "../components/theme-provider";
 import { colors } from "../theme/colors";
-import { User, Car, DiagnosticData, Diagnostic } from "../../types";
+import { User, DiagnosticData, Diagnostic } from "../../types";
 import { useState } from "react";
-
 
 type DiagnosticsDetailScreenRouteProp = RouteProp<
   RootStackParamList,
@@ -187,7 +192,6 @@ export default function DiagnosticsDetailScreen() {
 
   // Destructure data for the UI
   // const { user, car, diagnostic } = data;
-  
 
   const handleCall = () => {
     Linking.openURL(`tel:${user.phone}`);
@@ -199,7 +203,7 @@ export default function DiagnosticsDetailScreen() {
 
   const handleFindMechanic = () => {
     // Navigate to find mechanics screen with the diagnostic code as a parameter
-    navigation.navigate("FindMechanics", { diagnosticCode: diagnostic.code });
+    navigation.navigate("FindMechanics");
   };
 
   return (
@@ -402,8 +406,8 @@ export default function DiagnosticsDetailScreen() {
                     diagnostic.severity === "High"
                       ? colors.red[500]
                       : diagnostic.severity === "Moderate"
-                        ? colors.yellow[500]
-                        : colors.green[500],
+                      ? colors.yellow[500]
+                      : colors.green[500],
                 },
               ]}
             >
@@ -454,6 +458,13 @@ export default function DiagnosticsDetailScreen() {
         </CardFooter>
       </Card>
     </ScrollView>
+  );
+  // StatusBar for all screens except Home
+  return (
+    <>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" />
+      {/* ...existing code... */}
+    </>
   );
 }
 

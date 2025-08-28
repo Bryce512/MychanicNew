@@ -1,5 +1,6 @@
 /* eslint-disable no-bitwise */
 import React, { useState, useEffect, useCallback } from "react";
+import { StatusBar } from "react-native";
 import {
   View,
   StyleSheet,
@@ -34,18 +35,27 @@ const ScanDevicesScreen = () => {
   // Wrapper to support passing vehicleId to context connectToDevice
   function connectToDeviceWithVehicle(device: any, vehicleId: string | null) {
     // @ts-ignore
-    if (typeof connectToDevice === 'function' && connectToDevice.length > 1) {
+    if (typeof connectToDevice === "function" && connectToDevice.length > 1) {
       // Our patched context version
       return connectToDevice(device);
     } else {
       // Fallback for original signature
       return connectToDevice(device);
+      // StatusBar for all screens except Home
+      return (
+        <>
+          <StatusBar barStyle="light-content" backgroundColor="transparent" />
+          {/* ...existing code... */}
+        </>
+      );
     }
   }
 
   // Vehicle selection state
   const [vehicles, setVehicles] = useReactState<any[]>([]);
-  const [selectedVehicleId, setSelectedVehicleId] = useReactState<string | null>(null);
+  const [selectedVehicleId, setSelectedVehicleId] = useReactState<
+    string | null
+  >(null);
   // Fetch vehicles for dropdown
   useReactEffect(() => {
     const fetchVehicles = async () => {
@@ -64,19 +74,32 @@ const ScanDevicesScreen = () => {
   const renderVehicleDropdown = () => (
     <View style={{ margin: 16 }}>
       <Text variant="titleSmall">Select Vehicle</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginTop: 8 }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ flexDirection: "row", marginTop: 8 }}
+      >
         {vehicles.map((vehicle) => (
           <TouchableOpacity
             key={vehicle.id}
             style={{
               padding: 10,
-              backgroundColor: selectedVehicleId === vehicle.id ? theme.colors.primary : '#eee',
+              backgroundColor:
+                selectedVehicleId === vehicle.id
+                  ? theme.colors.primary
+                  : "#eee",
               borderRadius: 8,
               marginRight: 8,
             }}
             onPress={() => setSelectedVehicleId(vehicle.id)}
           >
-            <Text style={{ color: selectedVehicleId === vehicle.id ? '#fff' : '#333' }}>{vehicle.name}</Text>
+            <Text
+              style={{
+                color: selectedVehicleId === vehicle.id ? "#fff" : "#333",
+              }}
+            >
+              {vehicle.name}
+            </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -224,7 +247,9 @@ const ScanDevicesScreen = () => {
         } catch (error) {
           if (error && typeof error === "object" && "message" in error) {
             console.error(
-              `Error checking Bluetooth state: ${(error as { message: string }).message}`
+              `Error checking Bluetooth state: ${
+                (error as { message: string }).message
+              }`
             );
           } else {
             console.error(
@@ -431,15 +456,17 @@ const ScanDevicesScreen = () => {
         </Card>
       )}
 
-  {/* Import the device selector component */}
-  <BluetoothDeviceSelector
-    visible={showDeviceSelector}
-    onClose={() => setShowDeviceSelector(false)}
-    devices={discoveredDevices}
-    onSelectDevice={(device) => connectToDeviceWithVehicle(device, selectedVehicleId)}
-    isScanning={isScanning}
-    onScanAgain={startScan}
-  />
+      {/* Import the device selector component */}
+      <BluetoothDeviceSelector
+        visible={showDeviceSelector}
+        onClose={() => setShowDeviceSelector(false)}
+        devices={discoveredDevices}
+        onSelectDevice={(device) =>
+          connectToDeviceWithVehicle(device, selectedVehicleId)
+        }
+        isScanning={isScanning}
+        onScanAgain={startScan}
+      />
 
       {/* Connection Status button */}
       <TouchableOpacity
@@ -501,7 +528,9 @@ const ScanDevicesScreen = () => {
                     } catch (err) {
                       Alert.alert(
                         "Command Error",
-                        `Error sending command: ${err instanceof Error ? err.message : String(err)}`
+                        `Error sending command: ${
+                          err instanceof Error ? err.message : String(err)
+                        }`
                       );
                     }
                   },

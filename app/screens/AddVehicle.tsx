@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { StatusBar } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import firebaseService from "../services/firebaseService";
 import VehicleForm from "../components/VehicleForm";
@@ -25,5 +26,16 @@ export default function AddVehicleScreen() {
     }
   };
 
-  return <VehicleForm onSave={handleSave} loading={loading} isEdit={false} />;
+  return (
+    <>
+      <VehicleForm onSave={handleSave} loading={loading} isEdit={false} />
+    </>
+  );
+  // StatusBar for all screens except Home
+  return (
+    <>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" />
+      {/* ...existing code... */}
+    </>
+  );
 }

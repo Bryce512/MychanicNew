@@ -4,13 +4,13 @@ import {
   Text,
   TextInput,
   Button,
-  StyleSheet,
   ScrollView,
   Alert,
   Image,
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
+import { vehicleFormStyles } from "../theme/styles/VehicleForm.styles";
 import type { KeyboardTypeOptions } from "react-native";
 import { launchImageLibrary } from "react-native-image-picker";
 import firebaseService from "../services/firebaseService";
@@ -23,14 +23,7 @@ interface VehicleFormProps {
   isEdit?: boolean;
 }
 
-const VEHICLE_FIELDS = [
-  "year",
-  "make",
-  "model",
-  "mileage",
-  "name",
-  "engine",
-];
+const VEHICLE_FIELDS = ["year", "make", "model", "mileage", "name", "engine"];
 
 const DEFAULT_IMAGE =
   "https://firebasestorage.googleapis.com/v0/b/fluid-tangent-405719.firebasestorage.app/o/public%2Fcar_default.png?alt=media&token=5232adad-a5f7-4b8c-be47-781163a7eaa1";
@@ -45,19 +38,19 @@ const MAINT_FIELDS: {
     key: "milesBetweenOilChanges",
     label: "Miles Between Oil Changes",
     keyboardType: "numeric",
-    placeholder: "We Suggest 5000 miles"
+    placeholder: "We Suggest 5000 miles",
   },
   {
     key: "milesBetweenBrakeChanges",
     label: "Miles Between Brake Changes",
     keyboardType: "numeric",
-    placeholder: "We Suggest 20000 miles"
+    placeholder: "We Suggest 20000 miles",
   },
   {
     key: "batteryInstallDate",
     label: "Battery Install Date (YYYY-MM-DD)",
     keyboardType: "default",
-    placeholder: "Found on a sticker on the battery"
+    placeholder: "Found on a sticker on the battery",
   },
 ];
 
@@ -242,23 +235,23 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>
+    <ScrollView contentContainerStyle={vehicleFormStyles.container}>
+      <Text style={vehicleFormStyles.title}>
         {isEdit ? "Edit Vehicle Info" : "Add Vehicle"}
       </Text>
 
       {/* Image Picker and Display */}
-      <View style={styles.imageSection}>
+      <View style={vehicleFormStyles.imageSection}>
         <TouchableOpacity
           onPress={pickImage}
           disabled={uploading || saving || loading}
         >
           <Image
             source={{ uri: image || DEFAULT_IMAGE }}
-            style={styles.image}
+            style={vehicleFormStyles.image}
             resizeMode="cover"
           />
-          <Text style={styles.imageLabel}>
+          <Text style={vehicleFormStyles.imageLabel}>
             {uploading ? "Uploading..." : "Tap to change image"}
           </Text>
         </TouchableOpacity>
@@ -266,12 +259,12 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
       </View>
 
       {VEHICLE_FIELDS.map((field) => (
-        <View key={field} style={styles.inputGroup}>
-          <Text style={styles.label}>
+        <View key={field} style={vehicleFormStyles.inputGroup}>
+          <Text style={vehicleFormStyles.label}>
             {field.charAt(0).toUpperCase() + field.slice(1)}
           </Text>
           <TextInput
-            style={styles.input}
+            style={vehicleFormStyles.input}
             value={form[field]?.toString() || ""}
             onChangeText={(text) => handleChange(field, text)}
             keyboardType={
@@ -281,16 +274,20 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
         </View>
       ))}
       {/* Maintenance Config Fields */}
-      <Text style={[styles.label, { marginTop: 16, fontWeight: "bold" }]}>
+      <Text
+        style={[vehicleFormStyles.label, { marginTop: 16, fontWeight: "bold" }]}
+      >
         Maintenance Settings
       </Text>
       {MAINT_FIELDS.map((field) => (
-        <View key={field.key} style={styles.inputGroup}>
-          <Text style={styles.label}>{field.label}</Text>
+        <View key={field.key} style={vehicleFormStyles.inputGroup}>
+          <Text style={vehicleFormStyles.label}>{field.label}</Text>
           <TextInput
-            style={styles.input}
+            style={vehicleFormStyles.input}
             value={maintConfig[field.key]}
-            onChangeText={(text) => handleMaintChange(field.key as string, text)}
+            onChangeText={(text) =>
+              handleMaintChange(field.key as string, text)
+            }
             keyboardType={field.keyboardType}
             placeholder={field.placeholder}
           />
@@ -314,52 +311,5 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
     </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    padding: 24,
-    backgroundColor: "#fff",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 24,
-    textAlign: "center",
-  },
-  imageSection: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  image: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    backgroundColor: "#f9f9f9",
-  },
-  imageLabel: {
-    marginTop: 8,
-    color: "#888",
-    fontSize: 14,
-    textAlign: "center",
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 6,
-    padding: 10,
-    fontSize: 16,
-    backgroundColor: "#f9f9f9",
-  },
-});
 
 export default VehicleForm;

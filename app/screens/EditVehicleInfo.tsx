@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { StatusBar } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import firebaseService from "../services/firebaseService";
@@ -42,5 +43,12 @@ export default function EditVehicleInfoScreen() {
       onDelete={handleDelete}
       isEdit={true}
     />
+  );
+  // StatusBar for all screens except Home
+  return (
+    <>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" />
+      {/* ...existing code... */}
+    </>
   );
 }

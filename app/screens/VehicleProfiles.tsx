@@ -9,6 +9,7 @@ import {
   Image,
   TouchableOpacity,
   useColorScheme,
+  StatusBar,
 } from "react-native";
 import { useBluetooth } from "../contexts/BluetoothContext";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -95,7 +96,7 @@ export default function VehicleProfilesScreen() {
         <Feather
           name="user"
           size={24}
-          style={{ marginRight: 16 }}
+          style={{ marginRight: 16, color: colors.white }}
           onPress={() => navigation.navigate("Profile")}
         />
       ),
@@ -182,11 +183,13 @@ export default function VehicleProfilesScreen() {
   })();
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <View>
-            <Text style={[styles.title, isDark && styles.textLight]}>
+    <>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" />
+      <SafeAreaView style={{ flex: 1 }}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <View>
+              <Text style={[styles.title, isDark && styles.textLight]}>
               My Vehicles
             </Text>
             <Text style={[styles.subtitle, isDark && styles.textMutedLight]}>
@@ -979,6 +982,8 @@ export default function VehicleProfilesScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+    </>
+    
   );
 }
 
