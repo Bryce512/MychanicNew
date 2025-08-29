@@ -12,7 +12,7 @@ install! 'cocoapods',
   :deterministic_uuids => false
 
 prepare_react_native_project!
-use_modular_headers!
+# use_modular_headers!
 
 # Make sure all necessary Firebase subspecs are included
 def firebase_pods
@@ -24,7 +24,7 @@ def firebase_pods
   
   # If using other Firebase features, add them here
   # pod 'Firebase/Firestore'
-  # pod 'Firebase/Storage'
+  pod 'Firebase/Storage'
 end
 
 target 'Mychanic' do

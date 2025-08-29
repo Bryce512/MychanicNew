@@ -1,4 +1,4 @@
-import ExpoModulesCore
+import Expo
 import FirebaseCore
 import React
 import ReactAppDependencyProvider
