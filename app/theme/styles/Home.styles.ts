@@ -4,6 +4,7 @@ import { colors } from "../colors";
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: 8,
   },
   topBar: {
     width: "100%",

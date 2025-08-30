@@ -48,6 +48,34 @@ export class PlacesService {
     return deg * (Math.PI / 180);
   }
 
+  // Enhance results with detailed information including phone numbers
+  private static async enhanceWithDetails(
+    places: PlaceResult[]
+  ): Promise<PlaceResult[]> {
+    const enhancedPlaces = await Promise.all(
+      places.map(async (place) => {
+        try {
+          const details = await this.getPlaceDetails(place.id);
+          if (details) {
+            return {
+              ...place,
+              phoneNumber: details.formatted_phone_number,
+              website: details.website,
+              // Update opening hours if available
+              isOpen: details.opening_hours?.open_now ?? place.isOpen,
+            };
+          }
+          return place;
+        } catch (error) {
+          console.error(`Error getting details for ${place.name}:`, error);
+          return place;
+        }
+      })
+    );
+
+    return enhancedPlaces;
+  }
+
   static async searchNearbyMechanics(
     latitude: number,
     longitude: number,
@@ -119,19 +147,27 @@ export class PlacesService {
             (a, b) => (a.distance || 0) - (b.distance || 0)
           );
 
+          // Enhance the first few results with detailed information (including phone numbers)
+          const enhancedPlaces = await this.enhanceWithDetails(
+            sortedPlaces.slice(0, 5)
+          );
+
+          // Combine enhanced results with remaining basic results
+          const finalResults = [...enhancedPlaces, ...sortedPlaces.slice(5)];
+
           // If we have enough results or reached max attempts, return
           if (
-            sortedPlaces.length >= minResults ||
+            finalResults.length >= minResults ||
             attempts === maxAttempts - 1
           ) {
-            return sortedPlaces;
+            return finalResults;
           }
 
           // Otherwise, expand radius and try again
           currentRadius *= 2;
           attempts++;
           console.log(
-            `Only found ${sortedPlaces.length} mechanics, expanding search radius to ${currentRadius}m`
+            `Only found ${finalResults.length} mechanics, expanding search radius to ${currentRadius}m`
           );
         } else {
           console.error("Places API Error:", data.status, data.error_message);
@@ -218,7 +254,19 @@ export class PlacesService {
           };
         });
 
-        return places.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+        const sortedPlaces = places.sort(
+          (a, b) => (a.distance || 0) - (b.distance || 0)
+        );
+
+        // Enhance the first few results with detailed information (including phone numbers)
+        const enhancedPlaces = await this.enhanceWithDetails(
+          sortedPlaces.slice(0, 5)
+        );
+
+        // Combine enhanced results with remaining basic results
+        const finalResults = [...enhancedPlaces, ...sortedPlaces.slice(5)];
+
+        return finalResults;
       } else {
         console.error("Text Search Error:", data.status, data.error_message);
         return [];
@@ -246,6 +294,8 @@ export const getMockMechanicData = (
       reviewCount: 243,
       isOpen: true,
       distance: 1.2,
+      phoneNumber: "(512) 555-0123",
+      website: "https://precisionautocare.com",
     },
     {
       id: "2",
@@ -257,6 +307,8 @@ export const getMockMechanicData = (
       reviewCount: 187,
       isOpen: false,
       distance: 2.4,
+      phoneNumber: "(512) 555-0456",
+      website: "https://hometownmechanics.com",
     },
     {
       id: "3",
@@ -268,6 +320,8 @@ export const getMockMechanicData = (
       reviewCount: 311,
       isOpen: true,
       distance: 3.1,
+      phoneNumber: "(512) 555-0789",
+      website: "https://autotechsolutions.com",
     },
     {
       id: "4",
@@ -279,6 +333,7 @@ export const getMockMechanicData = (
       reviewCount: 156,
       isOpen: true,
       distance: 1.8,
+      phoneNumber: "(512) 555-0321",
     },
     {
       id: "5",
@@ -290,6 +345,8 @@ export const getMockMechanicData = (
       reviewCount: 298,
       isOpen: false,
       distance: 2.9,
+      phoneNumber: "(512) 555-0654",
+      website: "https://expertautorepair.com",
     },
   ];
 

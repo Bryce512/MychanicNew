@@ -87,7 +87,7 @@ export const styles = StyleSheet.create({
     gap: 8,
   },
   searchInputContainer: {
-    flex: 0.78,
+    flex: 0.73,
     position: "relative",
     flexDirection: "row",
     alignItems: "center",
@@ -99,7 +99,7 @@ export const styles = StyleSheet.create({
     minHeight: 40,
   },
   zipInputContainer: {
-    flex: 0.22,
+    flex: 0.3,
     position: "relative",
     flexDirection: "row",
     alignItems: "center",
@@ -152,6 +152,18 @@ export const styles = StyleSheet.create({
     marginTop: 8,
     backgroundColor: colors.primary[500],
     borderRadius: 8,
+  },
+  searchButtonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  clearButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 44,
   },
   filtersRow: {
     flexDirection: "row",

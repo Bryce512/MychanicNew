@@ -67,7 +67,6 @@ export const DiagnosticsProvider = ({
               lastSync: diagInfo?.lastSync || Date.now(),
               engineRunning: diagInfo?.engineRunning || false,
             };
-            console.log("Diagnostics loaded for vehicle:", v.id, diagMap[v.id]);
           } catch (vehicleError) {
             console.error(
               `Failed to fetch diagnostics for vehicle ${v.id}:`,

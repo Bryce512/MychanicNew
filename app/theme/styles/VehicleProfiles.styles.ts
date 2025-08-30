@@ -25,6 +25,7 @@ export const vehicleProfileStyles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     paddingBottom: 20,
+    paddingTop: 12,
   },
   vehicleListContainer: {
     paddingBottom: 16,

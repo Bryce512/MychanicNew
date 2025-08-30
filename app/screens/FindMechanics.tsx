@@ -19,6 +19,7 @@ import MapView, { Marker, Callout } from "react-native-maps";
 import * as Location from "expo-location";
 import Button from "../components/Button";
 import Card, { CardContent } from "../components/Card";
+import MechanicCard from "../components/MechanicCard";
 import { styles } from "../theme/styles/FindMechanics.styles";
 import { colors } from "../theme/colors";
 import {
@@ -45,6 +46,7 @@ const mechanicData = [
     estimatedTime: "Est. time: 1-2 hours",
     latitude: 30.2672,
     longitude: -97.7431,
+    phoneNumber: "(512) 555-0123",
   },
   {
     id: 2,
@@ -62,6 +64,7 @@ const mechanicData = [
     estimatedTime: "Est. time: 1-3 hours",
     latitude: 30.2849,
     longitude: -97.7341,
+    phoneNumber: "(512) 555-0456",
   },
   {
     id: 3,
@@ -79,6 +82,7 @@ const mechanicData = [
     estimatedTime: "Est. time: 2-4 hours",
     latitude: 30.25,
     longitude: -97.75,
+    phoneNumber: "(512) 555-0789",
   },
 ];
 
@@ -129,7 +133,7 @@ export default function FindMechanicsScreen() {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-      
+
       const coords = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
@@ -143,7 +147,7 @@ export default function FindMechanicsScreen() {
     } catch (error) {
       console.error("Error getting location:", error);
       Alert.alert("Error", "Unable to get your location. Please try again.");
-      
+
       // Fallback to Austin location if location fails
       const fallbackCoords = {
         latitude: 30.2672,
@@ -197,17 +201,17 @@ export default function FindMechanicsScreen() {
     }
 
     // Calculate bounds to fit all mechanics
-    const latitudes = nearbyMechanics.map(m => m.latitude);
-    const longitudes = nearbyMechanics.map(m => m.longitude);
-    
+    const latitudes = nearbyMechanics.map((m) => m.latitude);
+    const longitudes = nearbyMechanics.map((m) => m.longitude);
+
     const minLat = Math.min(...latitudes, userLocation.latitude);
     const maxLat = Math.max(...latitudes, userLocation.latitude);
     const minLng = Math.min(...longitudes, userLocation.longitude);
     const maxLng = Math.max(...longitudes, userLocation.longitude);
-    
+
     const latDelta = (maxLat - minLat) * 1.3; // Add 30% padding
     const lngDelta = (maxLng - minLng) * 1.3;
-    
+
     return {
       latitude: (minLat + maxLat) / 2,
       longitude: (minLng + maxLng) / 2,
@@ -217,18 +221,57 @@ export default function FindMechanicsScreen() {
   };
 
   const handleSearch = async () => {
-    if (!userLocation) return;
+    if (!searchQuery.trim() && !locationQuery.trim()) {
+      // If both fields are empty, reset to user's current location
+      if (userLocation) {
+        await fetchNearbyMechanics(
+          userLocation.latitude,
+          userLocation.longitude
+        );
+      }
+      return;
+    }
 
-    if (searchQuery.trim()) {
-      setIsLoadingMechanics(true);
-      try {
-        let mechanics: PlaceResult[];
+    setIsLoadingMechanics(true);
+    try {
+      let searchLatitude = userLocation?.latitude || 30.2672; // Default to Austin
+      let searchLongitude = userLocation?.longitude || -97.7431;
 
+      // Handle zip code/location search
+      if (locationQuery.trim()) {
+        console.log("Attempting to geocode:", locationQuery.trim());
+        try {
+          const coordinates = await geocodeLocation(locationQuery.trim());
+          if (coordinates) {
+            console.log("Geocoding successful, new coordinates:", coordinates);
+            searchLatitude = coordinates.latitude;
+            searchLongitude = coordinates.longitude;
+            // Update user location state to the new search location
+            setUserLocation(coordinates);
+          } else {
+            console.log("Geocoding failed, using default location");
+            Alert.alert(
+              "Location Not Found",
+              `Could not find "${locationQuery.trim()}". Using current location instead.`
+            );
+          }
+        } catch (error) {
+          console.error("Error geocoding location:", error);
+          Alert.alert(
+            "Location Error",
+            "Could not find the specified location. Using current location instead."
+          );
+        }
+      }
+
+      let mechanics: PlaceResult[];
+
+      if (searchQuery.trim()) {
+        // Search for mechanics by text query
         if (useMockData) {
-          // Filter mock data by search query
           const mockMechanics = getMockMechanicData(
-            userLocation.latitude,
-            userLocation.longitude
+            searchLatitude,
+            searchLongitude
           );
           mechanics = mockMechanics.filter(
             (mechanic) =>
@@ -236,28 +279,178 @@ export default function FindMechanicsScreen() {
               mechanic.address.toLowerCase().includes(searchQuery.toLowerCase())
           );
         } else {
-          // Search using Google Places API
           mechanics = await PlacesService.searchMechanicsByText(
             searchQuery,
-            userLocation.latitude,
-            userLocation.longitude
+            searchLatitude,
+            searchLongitude
           );
         }
-
-        setNearbyMechanics(mechanics);
-      } catch (error) {
-        console.error("Error searching mechanics:", error);
-      } finally {
-        setIsLoadingMechanics(false);
+      } else {
+        // Just search by location (zip code)
+        mechanics = await PlacesService.searchNearbyMechanics(
+          searchLatitude,
+          searchLongitude
+        );
       }
-    } else {
-      // Reset to all nearby mechanics
+
+      setNearbyMechanics(mechanics);
+    } catch (error) {
+      console.error("Error searching mechanics:", error);
+      Alert.alert(
+        "Search Error",
+        "Failed to search for mechanics. Please try again."
+      );
+    } finally {
+      setIsLoadingMechanics(false);
+    }
+  };
+
+  // Function to convert zip code or address to coordinates
+  const geocodeLocation = async (
+    location: string
+  ): Promise<{ latitude: number; longitude: number } | null> => {
+    console.log("Geocoding location:", location);
+
+    // Simple zip code fallback for common areas
+    const zipCodeFallbacks: {
+      [key: string]: { latitude: number; longitude: number };
+    } = {
+      "78701": { latitude: 30.2672, longitude: -97.7431 }, // Austin, TX
+      "78702": { latitude: 30.2849, longitude: -97.7341 }, // Austin, TX
+      "78703": { latitude: 30.2729, longitude: -97.7831 }, // Austin, TX
+      "90210": { latitude: 34.0901, longitude: -118.4065 }, // Beverly Hills, CA
+      "10001": { latitude: 40.7589, longitude: -73.9851 }, // New York, NY
+      "60601": { latitude: 41.8781, longitude: -87.6298 }, // Chicago, IL
+      "33101": { latitude: 25.7617, longitude: -80.1918 }, // Miami, FL
+      "75201": { latitude: 32.7767, longitude: -96.797 }, // Dallas, TX
+      "77001": { latitude: 29.7604, longitude: -95.3698 }, // Houston, TX
+    };
+
+    // Check if it's a known zip code first
+    if (zipCodeFallbacks[location.trim()]) {
+      console.log("Using zip code fallback for:", location);
+      return zipCodeFallbacks[location.trim()];
+    }
+
+    try {
+      // First try using Expo Location geocoding (works without additional API key)
+      console.log("Trying Expo Location geocoding...");
+      const geocoded = await Location.geocodeAsync(location);
+      console.log("Expo geocoding result:", geocoded);
+
+      if (geocoded.length > 0) {
+        const result = {
+          latitude: geocoded[0].latitude,
+          longitude: geocoded[0].longitude,
+        };
+        console.log("Expo geocoding successful:", result);
+        return result;
+      }
+
+      // Fallback: Try using Google Geocoding API
+      console.log("Trying Google Geocoding API...");
+      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+        location
+      )}&key=AIzaSyDH_5rYB8ja6e6xtjZ5hmmN7NosXNEpeI8`;
+
+      console.log("Google geocoding URL:", geocodeUrl);
+      const response = await fetch(geocodeUrl);
+      const data = await response.json();
+      console.log("Google geocoding response:", data);
+
+      if (data.status === "OK" && data.results.length > 0) {
+        const result = {
+          latitude: data.results[0].geometry.location.lat,
+          longitude: data.results[0].geometry.location.lng,
+        };
+        console.log("Google geocoding successful:", result);
+        return result;
+      } else {
+        console.log(
+          "Google geocoding failed:",
+          data.status,
+          data.error_message
+        );
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Geocoding error:", error);
+      return null;
+    }
+  };
+
+  const handleClearSearch = async () => {
+    setSearchQuery("");
+    setLocationQuery("");
+    if (userLocation) {
       await fetchNearbyMechanics(userLocation.latitude, userLocation.longitude);
     }
   };
 
+  const convertMockToPlaceResult = (
+    mockMechanic: (typeof mechanicData)[0]
+  ): PlaceResult => ({
+    id: mockMechanic.id.toString(),
+    name: mockMechanic.name,
+    address: mockMechanic.location,
+    latitude: mockMechanic.latitude,
+    longitude: mockMechanic.longitude,
+    rating: mockMechanic.rating,
+    reviewCount: mockMechanic.reviewCount,
+    isOpen: mockMechanic.availability === "Available Today",
+    distance: mockMechanic.distance,
+    // Include phone number from mock data
+    photoUrl: mockMechanic.image,
+    phoneNumber: mockMechanic.phoneNumber,
+    website: undefined,
+    priceLevel: undefined,
+  });
+
+  const handleMechanicPress = (mechanic: PlaceResult) => {
+    // Show detailed view with all mechanic data
+    Alert.alert(
+      mechanic.name,
+      `Address: ${mechanic.address}\n` +
+        `Rating: ${
+          mechanic.rating ? mechanic.rating.toFixed(1) : "No rating"
+        }\n` +
+        `Reviews: ${mechanic.reviewCount || "No reviews"}\n` +
+        `Status: ${
+          mechanic.isOpen === undefined
+            ? "Hours unknown"
+            : mechanic.isOpen
+            ? "Open now"
+            : "Closed"
+        }\n` +
+        `Distance: ${
+          mechanic.distance
+            ? mechanic.distance.toFixed(1) + " miles"
+            : "Distance unknown"
+        }\n` +
+        `Phone: ${mechanic.phoneNumber || "Not available"}\n` +
+        `Website: ${mechanic.website || "Not available"}\n` +
+        `Price Level: ${
+          mechanic.priceLevel
+            ? "$".repeat(mechanic.priceLevel)
+            : "Not available"
+        }`,
+      [
+        { text: "Call", onPress: () => console.log("Call pressed") },
+        {
+          text: "Directions",
+          onPress: () => console.log("Directions pressed"),
+        },
+        { text: "Close", style: "cancel" },
+      ]
+    );
+  };
+
   const renderMechanicCard = ({ item }: { item: (typeof mechanicData)[0] }) => (
-    <MechanicCard mechanic={item} isDark={isDark} />
+    <MechanicCard
+      mechanic={convertMockToPlaceResult(item)}
+      onPress={() => handleMechanicPress(convertMockToPlaceResult(item))}
+    />
   );
 
   return (
@@ -299,6 +492,8 @@ export default function FindMechanicsScreen() {
                   }
                   value={searchQuery}
                   onChangeText={setSearchQuery}
+                  onSubmitEditing={handleSearch}
+                  returnKeyType="search"
                 />
               </View>
 
@@ -320,22 +515,48 @@ export default function FindMechanicsScreen() {
                     isDark && styles.inputDark,
                     { paddingLeft: 24 },
                   ]}
-                  placeholder="Zip Code"
+                  placeholder="Zip Code or City"
                   placeholderTextColor={
                     isDark ? colors.gray[400] : colors.gray[500]
                   }
                   value={locationQuery}
                   onChangeText={setLocationQuery}
+                  onSubmitEditing={handleSearch}
+                  returnKeyType="search"
                 />
               </View>
             </View>
 
-            <Button
-              title={isLoadingMechanics ? "Searching..." : "Search"}
-              onPress={handleSearch}
-              style={styles.searchButton}
-              disabled={isLoadingMechanics}
-            />
+            <View style={styles.searchButtonRow}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Button
+                  title={isLoadingMechanics ? "Searching..." : "Search"}
+                  onPress={handleSearch}
+                  style={styles.searchButton}
+                  disabled={isLoadingMechanics}
+                />
+              </View>
+              {(searchQuery.trim() || locationQuery.trim()) && (
+                <TouchableOpacity
+                  style={[
+                    styles.clearButton,
+                    {
+                      backgroundColor: isDark
+                        ? colors.gray[700]
+                        : colors.gray[200],
+                    },
+                  ]}
+                  onPress={handleClearSearch}
+                  disabled={isLoadingMechanics}
+                >
+                  <Feather
+                    name="x"
+                    size={16}
+                    color={isDark ? colors.gray[300] : colors.gray[600]}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
 
@@ -425,10 +646,10 @@ export default function FindMechanicsScreen() {
                 </View>
               ) : nearbyMechanics.length > 0 ? (
                 nearbyMechanics.map((mechanic) => (
-                  <RealMechanicCard
+                  <MechanicCard
                     key={mechanic.id}
                     mechanic={mechanic}
-                    isDark={isDark}
+                    onPress={() => handleMechanicPress(mechanic)}
                   />
                 ))
               ) : (
@@ -557,317 +778,3 @@ export default function FindMechanicsScreen() {
 }
 
 type Mechanic = (typeof mechanicData)[0];
-
-function MechanicCard({
-  mechanic,
-  isDark,
-}: {
-  mechanic: Mechanic;
-  isDark: boolean;
-}) {
-  const navigation = useNavigation();
-
-  return (
-    <Card style={styles.mechanicCard}>
-      <CardContent style={styles.mechanicCardContent}>
-        <Image
-          source={{ uri: mechanic.image }}
-          style={styles.mechanicImage}
-          resizeMode="cover"
-        />
-
-        <View style={styles.mechanicInfo}>
-          <View style={styles.mechanicHeader}>
-            <View>
-              <Text style={[styles.mechanicName, isDark && styles.textLight]}>
-                {mechanic.name}
-              </Text>
-              <View style={styles.locationContainer}>
-                <Feather
-                  name="map-pin"
-                  size={12}
-                  color={isDark ? colors.gray[400] : colors.gray[500]}
-                />
-                <Text
-                  style={[styles.locationText, isDark && styles.textMutedLight]}
-                >
-                  {mechanic.location} • {mechanic.distance} miles away
-                </Text>
-              </View>
-            </View>
-
-            <View
-              style={[
-                styles.availabilityBadge,
-                mechanic.availability === "Available Today"
-                  ? styles.availabilityToday
-                  : styles.availabilityTomorrow,
-                isDark && styles.availabilityBadgeDark,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.availabilityText,
-                  mechanic.availability === "Available Today"
-                    ? styles.availabilityTodayText
-                    : styles.availabilityTomorrowText,
-                  isDark && styles.availabilityTextDark,
-                ]}
-              >
-                {mechanic.availability}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.ratingContainer}>
-            <View style={styles.starsContainer}>
-              {[...Array(5)].map((_, i) => (
-                <Feather
-                  key={i}
-                  name="star"
-                  size={14}
-                  color={
-                    i < Math.floor(mechanic.rating)
-                      ? colors.primary[500]
-                      : colors.gray[300]
-                  }
-                />
-              ))}
-            </View>
-            <Text style={[styles.ratingText, isDark && styles.textLight]}>
-              {mechanic.rating.toFixed(1)}
-            </Text>
-            <Text style={[styles.reviewCount, isDark && styles.textMutedLight]}>
-              ({mechanic.reviewCount} reviews)
-            </Text>
-          </View>
-
-          <View style={styles.servicesContainer}>
-            {mechanic.services.map((service, index) => (
-              <View
-                key={index}
-                style={[styles.serviceBadge, isDark && styles.serviceBadgeDark]}
-              >
-                <Text style={[styles.serviceText, isDark && styles.textLight]}>
-                  {service}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.detailsContainer}>
-            <View style={styles.detailItem}>
-              <Feather
-                name="dollar-sign"
-                size={14}
-                color={isDark ? colors.gray[400] : colors.gray[500]}
-              />
-              <Text
-                style={[styles.detailText, isDark && styles.textMutedLight]}
-              >
-                {mechanic.pricingTransparency}
-              </Text>
-            </View>
-
-            <View style={styles.detailItem}>
-              <Feather
-                name="check-circle"
-                size={14}
-                color={isDark ? colors.gray[400] : colors.gray[500]}
-              />
-              <Text
-                style={[styles.detailText, isDark && styles.textMutedLight]}
-              >
-                {mechanic.certification}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.mechanicFooter}>
-            <Text style={[styles.priceText, isDark && styles.textLight]}>
-              Starting at ${mechanic.startingPrice} • {mechanic.estimatedTime}
-            </Text>
-
-            <Button
-              title="View Profile"
-              onPress={() => {}}
-              // onPress={() => navigation.navigate("MechanicProfile", { id: mechanic.id })}
-              size="sm"
-            />
-          </View>
-        </View>
-      </CardContent>
-    </Card>
-  );
-}
-
-function RealMechanicCard({
-  mechanic,
-  isDark,
-}: {
-  mechanic: PlaceResult;
-  isDark: boolean;
-}) {
-  const getAvailabilityStatus = () => {
-    if (mechanic.isOpen === undefined) return "Hours unknown";
-    return mechanic.isOpen ? "Open now" : "Closed";
-  };
-
-  const getAvailabilityStyle = () => {
-    if (mechanic.isOpen === undefined) return styles.availabilityTomorrow;
-    return mechanic.isOpen
-      ? styles.availabilityToday
-      : styles.availabilityTomorrow;
-  };
-
-  const getAvailabilityTextStyle = () => {
-    if (mechanic.isOpen === undefined) return styles.availabilityTomorrowText;
-    return mechanic.isOpen
-      ? styles.availabilityTodayText
-      : styles.availabilityTomorrowText;
-  };
-
-  const renderStars = (rating: number) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
-
-    for (let i = 0; i < 5; i++) {
-      if (i < fullStars) {
-        stars.push(
-          <Feather key={i} name="star" size={14} color={colors.primary[500]} />
-        );
-      } else if (i === fullStars && hasHalfStar) {
-        stars.push(
-          <Feather key={i} name="star" size={14} color={colors.primary[300]} />
-        );
-      } else {
-        stars.push(
-          <Feather key={i} name="star" size={14} color={colors.gray[300]} />
-        );
-      }
-    }
-    return stars;
-  };
-
-  return (
-    <Card style={styles.mechanicCard}>
-      <CardContent style={styles.mechanicCardContent}>
-        {mechanic.photoUrl ? (
-          <Image
-            source={{ uri: mechanic.photoUrl }}
-            style={styles.mechanicImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.mechanicImage, styles.placeholderImage]}>
-            <Feather
-              name="tool"
-              size={32}
-              color={isDark ? colors.gray[400] : colors.gray[500]}
-            />
-          </View>
-        )}
-
-        <View style={styles.mechanicInfo}>
-          <View style={styles.mechanicHeader}>
-            <View>
-              <Text style={[styles.mechanicName, isDark && styles.textLight]}>
-                {mechanic.name}
-              </Text>
-              <View style={styles.locationContainer}>
-                <Feather
-                  name="map-pin"
-                  size={12}
-                  color={isDark ? colors.gray[400] : colors.gray[500]}
-                />
-                <Text
-                  style={[styles.locationText, isDark && styles.textMutedLight]}
-                >
-                  {mechanic.address}
-                  {mechanic.distance && ` • ${mechanic.distance} miles away`}
-                </Text>
-              </View>
-            </View>
-
-            <View
-              style={[
-                styles.availabilityBadge,
-                getAvailabilityStyle(),
-                isDark && styles.availabilityBadgeDark,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.availabilityText,
-                  getAvailabilityTextStyle(),
-                  isDark && styles.availabilityTextDark,
-                ]}
-              >
-                {getAvailabilityStatus()}
-              </Text>
-            </View>
-          </View>
-
-          {mechanic.rating && (
-            <View style={styles.ratingContainer}>
-              <View style={styles.starsContainer}>
-                {renderStars(mechanic.rating)}
-              </View>
-              <Text style={[styles.ratingText, isDark && styles.textLight]}>
-                {mechanic.rating.toFixed(1)}
-              </Text>
-              {mechanic.reviewCount && (
-                <Text
-                  style={[styles.reviewCount, isDark && styles.textMutedLight]}
-                >
-                  ({mechanic.reviewCount} reviews)
-                </Text>
-              )}
-            </View>
-          )}
-
-          <View style={styles.detailsContainer}>
-            <View style={styles.detailItem}>
-              <Feather
-                name="clock"
-                size={14}
-                color={isDark ? colors.gray[400] : colors.gray[500]}
-              />
-              <Text
-                style={[styles.detailText, isDark && styles.textMutedLight]}
-              >
-                Auto Repair Service
-              </Text>
-            </View>
-
-            {mechanic.priceLevel && (
-              <View style={styles.detailItem}>
-                <Feather
-                  name="dollar-sign"
-                  size={14}
-                  color={isDark ? colors.gray[400] : colors.gray[500]}
-                />
-                <Text
-                  style={[styles.detailText, isDark && styles.textMutedLight]}
-                >
-                  {"$".repeat(mechanic.priceLevel)} Price Level
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.mechanicFooter}>
-            <Text style={[styles.priceText, isDark && styles.textLight]}>
-              {mechanic.distance
-                ? `${mechanic.distance} miles away`
-                : "Distance unknown"}
-            </Text>
-
-            <Button title="View Details" onPress={() => {}} size="sm" />
-          </View>
-        </View>
-      </CardContent>
-    </Card>
-  );
-}

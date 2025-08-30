@@ -189,16 +189,6 @@ export default function VehicleProfilesScreen() {
       <StatusBar barStyle="light-content" backgroundColor="transparent" />
       <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
         <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={styles.header}>
-            <View>
-              <Text style={[styles.title, isDark && styles.textLight]}>
-              My Vehicles
-            </Text>
-            <Text style={[styles.subtitle, isDark && styles.textMutedLight]}>
-              Manage your vehicle profiles and view diagnostic data
-            </Text>
-          </View>
-        </View>
 
         <View style={styles.content}>
           {/* Vehicle List */}
