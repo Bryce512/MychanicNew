@@ -19,6 +19,8 @@ import ScanDevicesScreen from "../screens/ScanDevices";
 import LoginScreen from "../screens/Login";
 import SignupScreen from "../screens/Signup";
 import EditVehicleInfoScreen from "../screens/EditVehicleInfo";
+import AddProfileScreen from "../screens/AddProfile";
+import EditProfileScreen from "../screens/EditProfile";
 
 export type RootStackParamList = {
   Main: undefined;
@@ -31,6 +33,9 @@ export type RootStackParamList = {
   EditVehicleInfo: { vehicle: any; userId: string };
   AddVehicle: undefined;
   FindMechanics: undefined;
+  VehicleProfiles: undefined;
+  AddProfile: undefined;
+  EditProfile: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -113,6 +118,20 @@ function MainTabs() {
           ),
         }}
       />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          headerShown: true,
+          headerStyle: { backgroundColor: colors.primary[500] },
+          headerTintColor: colors.white,
+          headerTitleStyle: { fontWeight: "bold", fontSize: 20 },
+          title: "Profile",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="user" size={size} color={color} />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -174,11 +193,6 @@ export default function AppNavigator() {
           />
           <Stack.Screen name="ScanDevices" component={ScanDevicesScreen} />
           <Stack.Screen
-            name="Profile"
-            component={ProfileScreen}
-            options={{ title: "Profile" }}
-          />
-          <Stack.Screen
             name="EditVehicleInfo"
             component={EditVehicleInfoScreen}
             options={{ title: "Edit Vehicle Info" }}
@@ -189,10 +203,31 @@ export default function AppNavigator() {
             options={{ title: "Add Vehicle" }}
           />
           <Stack.Screen
+            name="VehicleProfiles"
+            component={VehicleProfilesScreen}
+            options={{ title: "Vehicle Profiles" }}
+          />
+          <Stack.Screen
             name="FindMechanics"
             component={FindMechanicsScreen}
             options={{ title: "Find Mechanics" }}
           />
+          <Stack.Screen
+            name="AddProfile"
+            component={AddProfileScreen}
+            options={{ title: "Complete Profile" }}
+          />
+          <Stack.Screen
+            name="EditProfile"
+            component={EditProfileScreen}
+            options={{ title: "Edit Profile" }}
+          />
+          {/* <Stack.Screen
+            name="MechanicProfile"
+            component={MechanicProfileScreen}
+            options={{ title: "Mechanic Profile" }}
+          /> */}
+
         </>
       ) : (
         <>

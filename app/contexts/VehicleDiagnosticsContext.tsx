@@ -1,17 +1,5 @@
-import { useAuth } from "./AuthContext";
-// Wrapper to get userId from AuthContext and provide DiagnosticsProvider
-export const DiagnosticsProviderWrapper = ({
-  children,
-}: {
-  children: React.ReactNode;
-}) => {
-  const { user } = useAuth();
-  if (!user || !user.uid) return null;
-  return (
-    <DiagnosticsProvider userId={user.uid}>{children}</DiagnosticsProvider>
-  );
-};
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { useAuth } from "./AuthContext";
 import firebaseService from "../services/firebaseService";
 
 // Types for diagnostics data
@@ -61,31 +49,49 @@ export const DiagnosticsProvider = ({
       // For each vehicle, fetch diagInfo from userId/vehicles/vehicleId/diagInfo
       await Promise.all(
         vehicles.map(async (v: any) => {
-          const diagInfo = await firebaseService.getVehicleDiagInfo(
-            userId,
-            v.id
-          );
-          diagMap[v.id] = { 
-            vehicleId: v.id,
-            dtcCodes: diagInfo?.dtcCodes || [],
-            milesSinceLastOilChange: diagInfo?.milesSinceLastOilChange || 0,
-            milesBetweenOilChanges: diagInfo?.milesBetweenOilChanges || 5000,
-            battV: diagInfo?.battV || 0,
-            battVLastTimestamp:
-              diagInfo?.battVLastTimestamp || Date.now(),
-            milesSinceLastBrakeService:
-              diagInfo?.milesSinceLastBrakeService || 0,
-            milesBetweenBrakeService:
-              diagInfo?.milesBetweenBrakeService || 0,
-            lastSync:
-              diagInfo?.lastSync || Date.now(),
-            engineRunning: diagInfo?.engineRunning || false,
-          };
-          console.log(diagMap[v.id]); 
+          try {
+            const diagInfo = await firebaseService.getVehicleDiagInfo(
+              userId,
+              v.id
+            );
+            diagMap[v.id] = {
+              vehicleId: v.id,
+              dtcCodes: diagInfo?.dtcCodes || [],
+              milesSinceLastOilChange: diagInfo?.milesSinceLastOilChange || 0,
+              milesBetweenOilChanges: diagInfo?.milesBetweenOilChanges || 5000,
+              battV: diagInfo?.battV || 0,
+              battVLastTimestamp: diagInfo?.battVLastTimestamp || Date.now(),
+              milesSinceLastBrakeService:
+                diagInfo?.milesSinceLastBrakeService || 0,
+              milesBetweenBrakeService: diagInfo?.milesBetweenBrakeService || 0,
+              lastSync: diagInfo?.lastSync || Date.now(),
+              engineRunning: diagInfo?.engineRunning || false,
+            };
+            console.log("Diagnostics loaded for vehicle:", v.id, diagMap[v.id]);
+          } catch (vehicleError) {
+            console.error(
+              `Failed to fetch diagnostics for vehicle ${v.id}:`,
+              vehicleError
+            );
+            // Still add a default entry for this vehicle
+            diagMap[v.id] = {
+              vehicleId: v.id,
+              dtcCodes: [],
+              milesSinceLastOilChange: 0,
+              milesBetweenOilChanges: 5000,
+              battV: 0,
+              battVLastTimestamp: Date.now(),
+              milesSinceLastBrakeService: 0,
+              milesBetweenBrakeService: 0,
+              lastSync: Date.now(),
+              engineRunning: false,
+            };
+          }
         })
       );
       setDiagnostics(diagMap);
     } catch (e) {
+      console.error("Failed to fetch diagnostics:", e);
       setDiagnostics({});
     } finally {
       setLoading(false);
@@ -107,3 +113,22 @@ export const DiagnosticsProvider = ({
 };
 
 export const useDiagnostics = () => useContext(DiagnosticsContext);
+
+// Wrapper to get userId from AuthContext and provide DiagnosticsProvider
+export const DiagnosticsProviderWrapper = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
+  const { user } = useAuth();
+
+  // Instead of returning null, return children without the provider
+  // This prevents breaking the component tree when user is not authenticated
+  if (!user || !user.uid) {
+    return <>{children}</>;
+  }
+
+  return (
+    <DiagnosticsProvider userId={user.uid}>{children}</DiagnosticsProvider>
+  );
+};

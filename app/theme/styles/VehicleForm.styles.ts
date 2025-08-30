@@ -4,8 +4,8 @@ import { colors } from "../colors";
 export const vehicleFormStyles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    padding: 24,
-    backgroundColor: colors.white,
+    padding: 16,
+    backgroundColor: colors.primary[100],
   },
   title: {
     fontSize: 24,

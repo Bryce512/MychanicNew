@@ -1,4 +1,4 @@
-import storage from '@react-native-firebase/storage';
+import storage from "@react-native-firebase/storage";
 // Upload vehicle image to Firebase Storage and return the download URL
 export const uploadVehicleImage = async (
   userId: string,
@@ -33,7 +33,7 @@ export const updateVehicleDiagInfo = async (
   try {
     // If mileage is present, update lastMileageUpdate
     let dataToSet = { ...diagData };
-    if (typeof diagData.mileage !== 'undefined') {
+    if (typeof diagData.mileage !== "undefined") {
       dataToSet.lastMileageUpdate = Date.now();
     }
     await set(diagInfoRef, dataToSet);
@@ -251,6 +251,22 @@ export const onAuthChange = (
   return onAuthStateChanged(auth, callback);
 };
 
+export const getUserProfile = async (userId: string) => {
+  const database = getDatabase();
+  const userRef = ref(database, `users/${userId}/profile`);
+
+  try {
+    const snapshot = await get(userRef);
+    if (snapshot.exists()) {
+      return snapshot.val();
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    throw error;
+  }
+};
+
 // Vehicle-specific functions
 export const getVehicles = async (userId: string) => {
   const database = getDatabase();
@@ -282,7 +298,7 @@ export const addVehicle = async (userId: string, vehicleData: any) => {
 
   try {
     await set(newVehicleRef, vehicleData);
-    return { id: newVehicleRef.key, ...vehicleData };
+    return { id: newVehicleRef.key };
   } catch (error) {
     console.error("Error adding vehicle:", error);
     throw error;
@@ -299,7 +315,7 @@ export const updateVehicle = async (
 
   try {
     await update(vehicleRef, vehicleData);
-    return { id: vehicleId, ...vehicleData };
+    return { id: vehicleId };
   } catch (error) {
     console.error("Error updating vehicle:", error);
     throw error;
@@ -379,6 +395,21 @@ export const ensureUserProfile = async (user: FirebaseAuthTypes.User) => {
   }
 };
 
+// Update user profile in the database
+export const updateUserProfile = async (userId: string, profileData: any) => {
+  const database = getDatabase();
+  const userProfileRef = ref(database, `users/${userId}/profile`);
+
+  try {
+    await update(userProfileRef, profileData);
+    console.log("User profile updated successfully");
+    return true;
+  } catch (error) {
+    console.error("Error updating user profile:", error);
+    throw error;
+  }
+};
+
 export default {
   initializeFirebase,
   readData,
@@ -394,6 +425,8 @@ export default {
   deleteVehicle,
   getDiagnosticLogs,
   ensureUserProfile,
+  getUserProfile,
+  updateUserProfile,
   getVehicleDiagInfo,
   updateVehicleDiagInfo,
   uploadVehicleImage,

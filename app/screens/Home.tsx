@@ -20,7 +20,7 @@ export default function HomeScreen() {
   const isDark = colorScheme === "dark";
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
       <StatusBar
         translucent
         backgroundColor="transparent"

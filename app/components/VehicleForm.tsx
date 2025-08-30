@@ -18,12 +18,13 @@ import firebaseService from "../services/firebaseService";
 interface VehicleFormProps {
   initialData?: any;
   loading?: boolean;
-  onSave: (form: any) => Promise<void>;
+  onSave: (form: any) => Promise<{ id: string | null } | undefined>;
   onDelete?: () => Promise<void>;
   isEdit?: boolean;
 }
 
 const VEHICLE_FIELDS = ["year", "make", "model", "mileage", "name", "engine"];
+const REQUIRED_FIELDS = ["year", "make", "model", "mileage"];
 
 const DEFAULT_IMAGE =
   "https://firebasestorage.googleapis.com/v0/b/fluid-tangent-405719.firebasestorage.app/o/public%2Fcar_default.png?alt=media&token=5232adad-a5f7-4b8c-be47-781163a7eaa1";
@@ -69,6 +70,7 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
   isEdit = false,
 }) => {
   const [form, setForm] = useState({ ...initialData });
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [saving, setSaving] = useState(false);
   const [image, setImage] = useState<string | null>(initialData.image || null);
   const [uploading, setUploading] = useState(false);
@@ -142,6 +144,22 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
   };
 
   const handleSave = async () => {
+    // Validate required fields
+    const newErrors: { [key: string]: string } = {};
+    REQUIRED_FIELDS.forEach((field) => {
+      if (!form[field] || form[field].toString().trim() === "") {
+        newErrors[field] = `${
+          field.charAt(0).toUpperCase() + field.slice(1)
+        } is required`;
+      }
+    });
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      Alert.alert("Missing Fields", "Please fill out all required fields.");
+      return;
+    } else {
+      setErrors({});
+    }
     setSaving(true);
     try {
       // Parse numeric fields
@@ -151,40 +169,48 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
         mileage: form.mileage ? parseInt(form.mileage, 10) : undefined,
       };
 
-      // If image is a local URI, upload it, else use as is or default
+      // Save vehicle data first to get the vehicle ID
+      const vehicleResult = await onSave(updatedForm);
+      const vehicleId = vehicleResult?.id;
+
+      if (!vehicleId) {
+        Alert.alert("Error", "Failed to save vehicle data.");
+        setSaving(false);
+        return;
+      }
+
+      // Now handle image upload with the actual vehicle ID
       let imageUrl = DEFAULT_IMAGE;
       if (image) {
         if (image.startsWith("http")) {
           imageUrl = image;
         } else {
-          // Need userId and vehicleId for path
+          // Need userId for path
           const currentUser = firebaseService.getCurrentUser();
           if (!currentUser) {
             Alert.alert("Error", "You must be signed in to upload an image.");
             setSaving(false);
             return;
           }
-          // Use form.id if editing, otherwise generate a new id
-          const vehicleId = (
-            form.id ||
-            form.name ||
-            Date.now().toString()
-          ).replace(/\s+/g, "_");
+          // Use the vehicle ID we just got
           imageUrl = await uploadImageAsync(currentUser.uid, vehicleId, image);
         }
       }
-      updatedForm.image = imageUrl;
 
-      // Save vehicle data
-      await onSave(updatedForm);
+      // Update the vehicle with the image URL if it's different
+      if (imageUrl !== updatedForm.image) {
+        const currentUser = firebaseService.getCurrentUser();
+        if (currentUser) {
+          await firebaseService.updateVehicle(currentUser.uid, vehicleId, {
+            ...updatedForm,
+            image: imageUrl,
+          });
+        }
+      }
 
-      // Save maintenance config to /vehicle/vehicleId/maintConfigs
+      // Save maintenance config to /users/<userId>/vehicles/<vehicleId>/maintConfigs
       const currentUser = firebaseService.getCurrentUser();
-      const vehicleId = (form.id || form.name || Date.now().toString()).replace(
-        /\s+/g,
-        "_"
-      );
-      if (currentUser && vehicleId) {
+      if (currentUser) {
         const maintConfigData = {
           milesBetweenOilChanges: maintConfig.milesBetweenOilChanges
             ? parseInt(maintConfig.milesBetweenOilChanges, 10)
@@ -203,6 +229,7 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
         await db.set(ref, maintConfigData);
       }
     } catch (e) {
+      console.error("Error saving vehicle:", e);
       Alert.alert("Failed to save vehicle info.");
     } finally {
       setSaving(false);
@@ -262,6 +289,9 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
         <View key={field} style={vehicleFormStyles.inputGroup}>
           <Text style={vehicleFormStyles.label}>
             {field.charAt(0).toUpperCase() + field.slice(1)}
+            {REQUIRED_FIELDS.includes(field) && (
+              <Text style={{ color: "red" }}>*</Text>
+            )}
           </Text>
           <TextInput
             style={vehicleFormStyles.input}
@@ -271,6 +301,9 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
               field === "mileage" || field === "year" ? "numeric" : "default"
             }
           />
+          {errors[field] && (
+            <Text style={{ color: "red", fontSize: 12 }}>{errors[field]}</Text>
+          )}
         </View>
       ))}
       {/* Maintenance Config Fields */}

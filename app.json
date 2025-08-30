@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#003566"
     },
     "ios": {
       "supportsTablet": true,
@@ -19,15 +19,15 @@
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to your OBD-II device.",
         "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to connect to your OBD-II device.",
-        "UIBackgroundModes": [
-          "bluetooth-central"
-        ]
+        "NSLocationWhenInUseUsageDescription": "This app uses location to find nearby mechanics and services.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app uses location to find nearby mechanics and services.",
+        "UIBackgroundModes": ["bluetooth-central"]
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#003566"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.bryce512.Mychanic",
@@ -37,7 +37,8 @@
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.BLUETOOTH_SCAN",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ]
     },
     "web": {
@@ -48,15 +49,23 @@
       "@react-native-firebase/auth",
       "react-native-ble-manager",
       [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Mychanic to use your location to find nearby mechanics and services.",
+          "locationAlwaysPermission": "Allow Mychanic to use your location to find nearby mechanics and services.",
+          "locationWhenInUsePermission": "Allow Mychanic to use your location to find nearby mechanics and services."
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "ios": {
             "infoPlist": {
               "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to your OBD-II device.",
               "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to connect to your OBD-II device.",
-              "UIBackgroundModes": [
-                "bluetooth-central"
-              ]
+              "NSLocationWhenInUseUsageDescription": "This app uses location to find nearby mechanics and services.",
+              "NSLocationAlwaysAndWhenInUseUsageDescription": "This app uses location to find nearby mechanics and services.",
+              "UIBackgroundModes": ["bluetooth-central"]
             }
           },
           "android": {
@@ -65,7 +74,8 @@
               "android.permission.BLUETOOTH_ADMIN",
               "android.permission.BLUETOOTH_CONNECT",
               "android.permission.BLUETOOTH_SCAN",
-              "android.permission.ACCESS_FINE_LOCATION"
+              "android.permission.ACCESS_FINE_LOCATION",
+              "android.permission.ACCESS_COARSE_LOCATION"
             ]
           }
         }

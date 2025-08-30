@@ -1,4 +1,4 @@
-import { firebase } from "@react-native-firebase/app";
+import firebase from "@react-native-firebase/app";
 import "@react-native-firebase/auth";
 import "@react-native-firebase/database";
 
@@ -15,8 +15,17 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase if no apps have been initialized
+// Only initialize if running in debug mode or no apps exist
 if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
+  try {
+    firebase.initializeApp(firebaseConfig);
+    console.log("Firebase initialized from firebaseConfig.ts");
+  } catch (error: any) {
+    // Handle case where app is already initialized
+    if (!error.message?.includes('Default app has already been configured')) {
+      console.error("Firebase initialization error:", error);
+    }
+  }
 }
 
 // Export the firebase instance

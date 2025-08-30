@@ -17,8 +17,9 @@ export default function AddVehicleScreen() {
         setLoading(false);
         return;
       }
-      await firebaseService.addVehicle(currentUser.uid, form);
+      const result = await firebaseService.addVehicle(currentUser.uid, form);
       navigation.goBack();
+      return result; // Return the full result object with {id: "vehicleId"}
     } catch (e) {
       alert("Failed to add vehicle.");
     } finally {
@@ -29,13 +30,6 @@ export default function AddVehicleScreen() {
   return (
     <>
       <VehicleForm onSave={handleSave} loading={loading} isEdit={false} />
-    </>
-  );
-  // StatusBar for all screens except Home
-  return (
-    <>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" />
-      {/* ...existing code... */}
     </>
   );
 }

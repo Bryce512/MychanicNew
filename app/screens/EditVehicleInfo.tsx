@@ -14,8 +14,13 @@ export default function EditVehicleInfoScreen() {
   const handleSave = async (form: any) => {
     setLoading(true);
     try {
-      await firebaseService.updateVehicle(userId, vehicle.id, form);
+      const result = await firebaseService.updateVehicle(
+        userId,
+        vehicle.id,
+        form
+      );
       navigation.goBack();
+      return result; // Return the full result object with {id: "vehicleId"}
     } catch (e) {
       alert("Failed to save vehicle info.");
     } finally {
@@ -43,12 +48,5 @@ export default function EditVehicleInfoScreen() {
       onDelete={handleDelete}
       isEdit={true}
     />
-  );
-  // StatusBar for all screens except Home
-  return (
-    <>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" />
-      {/* ...existing code... */}
-    </>
   );
 }

@@ -18,7 +18,8 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    padding: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
     alignItems: "center",
   },
   title: {
@@ -79,6 +80,36 @@ export const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 16,
   },
+  searchRow: {
+    flexDirection: "row",
+    width: "100%",
+    marginBottom: 16,
+    gap: 8,
+  },
+  searchInputContainer: {
+    flex: 0.78,
+    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    paddingHorizontal: 8,
+    minHeight: 40,
+  },
+  zipInputContainer: {
+    flex: 0.22,
+    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    paddingHorizontal: 8,
+    minHeight: 40,
+  },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -102,10 +133,19 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 8,
     paddingHorizontal: 12,
+    textAlign: "left",
   },
   inputDark: {
     backgroundColor: colors.gray[800],
     color: colors.white,
+    borderColor: colors.gray[700],
+  },
+  searchInputContainerDark: {
+    backgroundColor: colors.gray[800],
+    borderColor: colors.gray[700],
+  },
+  zipInputContainerDark: {
+    backgroundColor: colors.gray[800],
     borderColor: colors.gray[700],
   },
   searchButton: {
@@ -198,16 +238,90 @@ export const styles = StyleSheet.create({
     gap: 16,
   },
   mapContainer: {
-    height: 200,
+    height: 400,
     backgroundColor: colors.gray[100],
     borderRadius: 8,
+    overflow: "hidden",
+    marginTop: 16,
+  },
+  map: {
+    width: "100%",
+    height: "100%",
+  },
+  mapPlaceholderContainer: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 16,
+    padding: 20,
   },
   mapPlaceholder: {
     color: colors.gray[500],
     fontSize: 16,
+    textAlign: "center",
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  enableLocationButton: {
+    marginTop: 8,
+  },
+  markerContainer: {
+    alignItems: "center",
+  },
+  marker: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 3,
+    borderColor: colors.white,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  markerAvailable: {
+    backgroundColor: colors.green[500],
+  },
+  markerBusy: {
+    backgroundColor: colors.yellow[500],
+  },
+  callout: {
+    width: 200,
+    padding: 0,
+  },
+  calloutContent: {
+    padding: 12,
+  },
+  calloutTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: colors.gray[900],
+    marginBottom: 4,
+  },
+  calloutLocation: {
+    fontSize: 12,
+    color: colors.gray[600],
+    marginBottom: 6,
+  },
+  calloutRating: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  calloutRatingText: {
+    fontSize: 12,
+    color: colors.gray[700],
+    marginLeft: 4,
+  },
+  calloutPrice: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.primary[500],
   },
   mechanicCard: {
     marginBottom: 16,
@@ -225,6 +339,11 @@ export const styles = StyleSheet.create({
     height: 120,
     borderRadius: 8,
     marginBottom: 12,
+  },
+  placeholderImage: {
+    backgroundColor: colors.gray[100],
+    alignItems: "center",
+    justifyContent: "center",
   },
   mechanicInfo: {
     flex: 1,
@@ -310,5 +429,35 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
     color: colors.primary[500],
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.gray[600],
+    textAlign: "center",
+  },
+  noResultsContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 40,
+  },
+  noResultsText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.gray[700],
+    textAlign: "center",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  noResultsSubtext: {
+    fontSize: 14,
+    color: colors.gray[500],
+    textAlign: "center",
   },
 });
