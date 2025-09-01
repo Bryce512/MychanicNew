@@ -16,18 +16,7 @@ export const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-  },
-  header: {
-    paddingVertical: 20,
-    paddingHorizontal: 12,
-    alignItems: "center",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: colors.primary[500],
-    marginBottom: 8,
-    textAlign: "center",
+    paddingTop: 8,
   },
   availabilityBadge: {
     borderRadius: 8,

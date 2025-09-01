@@ -871,12 +871,7 @@ export default function BookAppointmentScreen() {
     </SafeAreaView>
   );
   // StatusBar for all screens except Home
-  return (
-    <>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" />
-      {/* ...existing code... */}
-    </>
-  );
+  return <>{/* ...existing code... */}</>;
 }
 
 // Styles are now imported from app/theme/styles/BookAppointment.styles.ts

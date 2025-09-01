@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { StatusBar } from "react-native";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   TextInput,
   TouchableOpacity,
   Alert,
@@ -285,10 +283,5 @@ export default function SignupScreen() {
     </SafeAreaView>
   );
   // StatusBar for all screens except Home
-  return (
-    <>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" />
-      {/* ...existing code... */}
-    </>
-  );
+  return <>{/* ...existing code... */}</>;
 }

@@ -12,7 +12,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import Card, { CardContent } from "./Card";
 import { colors } from "../theme/colors";
-import { PlaceResult } from "../services/placesService";
+import { PlaceResult, PlacesService } from "../services/placesService";
 
 interface MechanicCardProps {
   mechanic: PlaceResult;
@@ -77,7 +77,7 @@ export default function MechanicCard({ mechanic, onPress }: MechanicCardProps) {
           {/* Image Section */}
           {mechanic.photoUrl ? (
             <Image
-              source={{ uri: mechanic.photoUrl }}
+              source={{ uri: PlacesService.getPhotoUrl(mechanic.photoUrl) }}
               style={styles.mechanicImage}
               resizeMode="cover"
             />

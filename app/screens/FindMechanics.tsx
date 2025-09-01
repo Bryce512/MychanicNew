@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import MapView, { Marker, Callout } from "react-native-maps";
 import * as Location from "expo-location";
@@ -454,13 +454,9 @@ export default function FindMechanicsScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={[styles.title, isDark && styles.textLight]}>
-            Find Mechanics
-          </Text>
+    <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
+      <ScrollView showsVerticalScrollIndicator={true}>
+        <View>
           <Text style={[styles.subtitle, isDark && styles.textMutedLight]}>
             Search for trusted mechanics in your area with transparent pricing
             and verified reviews.

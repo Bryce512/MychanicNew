@@ -84,16 +84,17 @@ function MainTabs() {
           backgroundColor: isDark ? colors.gray[900] : colors.white,
           borderTopColor: isDark ? colors.gray[800] : colors.gray[200],
         },
-        headerShown: false, // hide tab navigator header; handled by nested stacks
+        headerShown: true, // Show headers on all tabs
+        headerStyle: { backgroundColor: colors.primary[500] },
+        headerTintColor: colors.white,
+        headerTitleStyle: { fontWeight: "bold", fontSize: 20 },
       }}
     >
       <Tab.Screen
         name="Home"
         component={HomeScreen}
         options={{
-          headerShown: true,
-          headerTransparent: true,
-          headerTitle: "",
+          title: "Mychanic",
           tabBarIcon: ({ color, size }) => (
             <Feather name="home" size={size} color={color} />
           ),
@@ -103,6 +104,7 @@ function MainTabs() {
         name="Vehicles"
         component={VehiclesStackScreen}
         options={{
+          headerShown: false, // Let the nested stack handle the header
           tabBarIcon: ({ color, size }) => (
             <Feather name="truck" size={size} color={color} />
           ),
@@ -122,10 +124,6 @@ function MainTabs() {
         name="Profile"
         component={ProfileScreen}
         options={{
-          headerShown: true,
-          headerStyle: { backgroundColor: colors.primary[500] },
-          headerTintColor: colors.white,
-          headerTitleStyle: { fontWeight: "bold", fontSize: 20 },
           title: "Profile",
           tabBarIcon: ({ color, size }) => (
             <Feather name="user" size={size} color={color} />
@@ -141,6 +139,11 @@ import { View, ActivityIndicator } from "react-native";
 export default function AppNavigator() {
   const { user, isLoading } = useAuth();
   const { colors } = useTheme();
+
+  // Set global status bar for blue headers
+  React.useEffect(() => {
+    StatusBar.setBarStyle("light-content", true);
+  }, []);
 
   // Debug logging
   console.log(
@@ -205,7 +208,7 @@ export default function AppNavigator() {
           <Stack.Screen
             name="VehicleProfiles"
             component={VehicleProfilesScreen}
-            options={{ title: "Vehicle Profiles" }}
+            options={{ title: "My Vehicles" }}
           />
           <Stack.Screen
             name="FindMechanics"
@@ -227,7 +230,6 @@ export default function AppNavigator() {
             component={MechanicProfileScreen}
             options={{ title: "Mechanic Profile" }}
           /> */}
-
         </>
       ) : (
         <>

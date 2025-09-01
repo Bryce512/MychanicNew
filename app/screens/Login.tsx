@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { StatusBar } from "react-native";
 import {
   View,
   Text,
@@ -204,7 +203,6 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" />
     </SafeAreaView>
   );
 }

@@ -22,6 +22,7 @@ const GOOGLE_PLACES_API_KEY = "AIzaSyDH_5rYB8ja6e6xtjZ5hmmN7NosXNEpeI8"; // Repl
 const USE_MOCK_DATA_FALLBACK = false; // Set to false when API key is properly configured
 
 const PLACES_API_BASE_URL = "https://maps.googleapis.com/maps/api/place";
+const PLACES_NEW_API_BASE_URL = "https://places.googleapis.com/v1";
 
 export class PlacesService {
   private static calculateDistance(
@@ -46,6 +47,16 @@ export class PlacesService {
 
   private static deg2rad(deg: number): number {
     return deg * (Math.PI / 180);
+  }
+
+  // Helper function to generate photo URL when needed (to avoid automatic photo API calls)
+  static getPhotoUrl(photoReference: string, maxWidth: number = 400): string {
+    // Check if it's a new API photo name (starts with places/)
+    if (photoReference.startsWith("places/")) {
+      return `${PLACES_NEW_API_BASE_URL}/${photoReference}/media?maxWidthPx=${maxWidth}&key=${GOOGLE_PLACES_API_KEY}`;
+    }
+    // Fallback to old API format
+    return `${PLACES_API_BASE_URL}/photo?maxwidth=${maxWidth}&photoreference=${photoReference}&key=${GOOGLE_PLACES_API_KEY}`;
   }
 
   // Enhance results with detailed information including phone numbers
@@ -103,42 +114,64 @@ export class PlacesService {
           `Searching with radius: ${currentRadius}m (attempt ${attempts + 1})`
         );
 
-        // Search for auto repair shops
-        const searchUrl = `${PLACES_API_BASE_URL}/nearbysearch/json?location=${latitude},${longitude}&radius=${currentRadius}&type=car_repair&key=${GOOGLE_PLACES_API_KEY}`;
+        // Search for auto repair shops using NEW Places API
+        const searchUrl = `${PLACES_NEW_API_BASE_URL}/places:searchNearby`;
 
-        console.log(
-          "Making Places API request to:",
-          searchUrl.replace(GOOGLE_PLACES_API_KEY, "API_KEY_HIDDEN")
-        );
+        const requestBody = {
+          includedTypes: ["car_repair"],
+          maxResultCount: 20,
+          locationRestriction: {
+            circle: {
+              center: {
+                latitude: latitude,
+                longitude: longitude,
+              },
+              radius: currentRadius,
+            },
+          },
+        };
 
-        const response = await fetch(searchUrl);
+        console.log("Making Places API (New) request to:", searchUrl);
+
+        const response = await fetch(searchUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+            "X-Goog-FieldMask":
+              "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.currentOpeningHours,places.photos,places.priceLevel",
+          },
+          body: JSON.stringify(requestBody),
+        });
+
         const data = await response.json();
 
-        console.log("Places API Response Status:", data.status);
+        console.log("Places API (New) Response:", response.status);
 
-        if (data.status === "OK") {
-          console.log(`Found ${data.results.length} nearby mechanics`);
-          const places: PlaceResult[] = data.results.map((place: any) => {
+        if (response.ok && data.places) {
+          console.log(`Found ${data.places.length} nearby mechanics`);
+          const places: PlaceResult[] = data.places.map((place: any) => {
             const distance = this.calculateDistance(
               latitude,
               longitude,
-              place.geometry.location.lat,
-              place.geometry.location.lng
+              place.location.latitude,
+              place.location.longitude
             );
 
             return {
-              id: place.place_id,
-              name: place.name,
-              address: place.vicinity || place.formatted_address,
-              latitude: place.geometry.location.lat,
-              longitude: place.geometry.location.lng,
+              id: place.id,
+              name: place.displayName?.text || place.displayName,
+              address: place.formattedAddress,
+              latitude: place.location.latitude,
+              longitude: place.location.longitude,
               rating: place.rating,
-              reviewCount: place.user_ratings_total,
-              isOpen: place.opening_hours?.open_now,
-              photoUrl: place.photos?.[0]?.photo_reference
-                ? `${PLACES_API_BASE_URL}/photo?maxwidth=400&photoreference=${place.photos[0].photo_reference}&key=${GOOGLE_PLACES_API_KEY}`
+              reviewCount: place.userRatingCount,
+              isOpen: place.currentOpeningHours?.openNow,
+              // Don't load photos immediately to save costs - load them on demand
+              photoUrl: place.photos?.[0]?.name
+                ? place.photos[0].name // Store photo name for new API
                 : undefined,
-              priceLevel: place.price_level,
+              priceLevel: place.priceLevel,
               distance,
             };
           });
@@ -170,12 +203,16 @@ export class PlacesService {
             `Only found ${finalResults.length} mechanics, expanding search radius to ${currentRadius}m`
           );
         } else {
-          console.error("Places API Error:", data.status, data.error_message);
-          if (data.status === "REQUEST_DENIED") {
+          console.error(
+            "Places API (New) Error:",
+            response.status,
+            data?.error
+          );
+          if (response.status === 403) {
             console.error(
               "API Key Issue: Check your Google Cloud Console settings"
             );
-            console.error("1. Ensure Places API is enabled");
+            console.error("1. Ensure Places API (New) is enabled");
             console.error(
               "2. Check API key restrictions (iOS bundle ID: com.bryce512.Mychanic)"
             );
@@ -196,15 +233,30 @@ export class PlacesService {
   }
   static async getPlaceDetails(placeId: string): Promise<any> {
     try {
-      const detailsUrl = `${PLACES_API_BASE_URL}/details/json?place_id=${placeId}&fields=name,rating,formatted_phone_number,website,opening_hours,photos,reviews&key=${GOOGLE_PLACES_API_KEY}`;
+      // Use the NEW Places API that has 10,000 free requests per month
+      const detailsUrl = `https://places.googleapis.com/v1/places/${placeId}?fields=id,displayName,rating,nationalPhoneNumber,websiteUri,regularOpeningHours,photos&key=${GOOGLE_PLACES_API_KEY}`;
 
       const response = await fetch(detailsUrl);
       const data = await response.json();
 
-      if (data.status === "OK") {
-        return data.result;
+      if (response.ok && data) {
+        // Convert new API format to match old format for compatibility
+        return {
+          name: data.displayName?.text || data.displayName,
+          rating: data.rating,
+          formatted_phone_number: data.nationalPhoneNumber,
+          website: data.websiteUri,
+          opening_hours: {
+            open_now: data.regularOpeningHours?.openNow,
+          },
+          photos: data.photos,
+        };
       } else {
-        console.error("Place Details Error:", data.status, data.error_message);
+        console.error(
+          "Place Details Error (New API):",
+          response.status,
+          data?.error
+        );
         return null;
       }
     } catch (error) {
@@ -221,35 +273,58 @@ export class PlacesService {
     radius: number = 10000
   ): Promise<PlaceResult[]> {
     try {
-      const searchUrl = `${PLACES_API_BASE_URL}/textsearch/json?query=${encodeURIComponent(
-        query + " auto repair mechanic"
-      )}&location=${latitude},${longitude}&radius=${radius}&key=${GOOGLE_PLACES_API_KEY}`;
+      const searchUrl = `${PLACES_NEW_API_BASE_URL}/places:searchText`;
 
-      const response = await fetch(searchUrl);
+      const requestBody = {
+        textQuery: query + " auto repair mechanic",
+        locationBias: {
+          circle: {
+            center: {
+              latitude: latitude,
+              longitude: longitude,
+            },
+            radius: radius,
+          },
+        },
+        maxResultCount: 20,
+      };
+
+      const response = await fetch(searchUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+          "X-Goog-FieldMask":
+            "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.currentOpeningHours,places.photos,places.priceLevel",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
       const data = await response.json();
 
-      if (data.status === "OK") {
-        const places: PlaceResult[] = data.results.map((place: any) => {
+      if (response.ok && data.places) {
+        const places: PlaceResult[] = data.places.map((place: any) => {
           const distance = this.calculateDistance(
             latitude,
             longitude,
-            place.geometry.location.lat,
-            place.geometry.location.lng
+            place.location.latitude,
+            place.location.longitude
           );
 
           return {
-            id: place.place_id,
-            name: place.name,
-            address: place.formatted_address,
-            latitude: place.geometry.location.lat,
-            longitude: place.geometry.location.lng,
+            id: place.id,
+            name: place.displayName?.text || place.displayName,
+            address: place.formattedAddress,
+            latitude: place.location.latitude,
+            longitude: place.location.longitude,
             rating: place.rating,
-            reviewCount: place.user_ratings_total,
-            isOpen: place.opening_hours?.open_now,
-            photoUrl: place.photos?.[0]?.photo_reference
-              ? `${PLACES_API_BASE_URL}/photo?maxwidth=400&photoreference=${place.photos[0].photo_reference}&key=${GOOGLE_PLACES_API_KEY}`
+            reviewCount: place.userRatingCount,
+            isOpen: place.currentOpeningHours?.openNow,
+            // Don't load photos immediately to save costs - load them on demand
+            photoUrl: place.photos?.[0]?.name
+              ? place.photos[0].name // Store photo name for new API
               : undefined,
-            priceLevel: place.price_level,
+            priceLevel: place.priceLevel,
             distance,
           };
         });
@@ -268,7 +343,11 @@ export class PlacesService {
 
         return finalResults;
       } else {
-        console.error("Text Search Error:", data.status, data.error_message);
+        console.error(
+          "Text Search Error (New API):",
+          response.status,
+          data?.error
+        );
         return [];
       }
     } catch (error) {

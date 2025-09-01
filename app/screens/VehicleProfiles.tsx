@@ -185,11 +185,8 @@ export default function VehicleProfilesScreen() {
   })();
 
   return (
-    <>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" />
-      <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
-        <ScrollView showsVerticalScrollIndicator={false}>
-
+    <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
+      <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           {/* Vehicle List */}
           <ScrollView
@@ -963,9 +960,7 @@ export default function VehicleProfilesScreen() {
                 </Text>
                 <Button
                   title="Add Your First Vehicle"
-                  onPress={() => {
-                    // Add vehicle logic
-                  }}
+                  onPress={() => navigation.navigate("AddVehicle")}
                   style={{ marginTop: 20 }}
                 />
               </CardContent>
@@ -974,7 +969,5 @@ export default function VehicleProfilesScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
-    </>
-    
   );
 }

@@ -42,12 +42,7 @@ const ScanDevicesScreen = () => {
       // Fallback for original signature
       return connectToDevice(device);
       // StatusBar for all screens except Home
-      return (
-        <>
-          <StatusBar barStyle="light-content" backgroundColor="transparent" />
-          {/* ...existing code... */}
-        </>
-      );
+      return <>{/* ...existing code... */}</>;
     }
   }
 

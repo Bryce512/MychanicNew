@@ -5,7 +5,7 @@ export const vehicleFormStyles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 16,
-    backgroundColor: colors.primary[100],
+    backgroundColor: colors.white,
   },
   title: {
     fontSize: 24,

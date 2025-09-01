@@ -54,12 +54,14 @@
     <string>This app uses Bluetooth to connect to your OBD-II device.</string>
     <key>NSBluetoothPeripheralUsageDescription</key>
     <string>This app uses Bluetooth to connect to your OBD-II device.</string>
-    <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Mychanic uses your location to find nearby mechanics and automotive services.</string>
-    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Mychanic uses your location to find nearby mechanics and automotive services.</string>
     <key>NSCameraUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your camera</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Allow Mychanic to use your location to find nearby mechanics and services.</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>Allow Mychanic to use your location to find nearby mechanics and services.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Allow Mychanic to use your location to find nearby mechanics and services.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your microphone</string>
     <key>NSPhotoLibraryAddUsageDescription</key>

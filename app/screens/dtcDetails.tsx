@@ -460,12 +460,7 @@ export default function DiagnosticsDetailScreen() {
     </ScrollView>
   );
   // StatusBar for all screens except Home
-  return (
-    <>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" />
-      {/* ...existing code... */}
-    </>
-  );
+  return <>{/* ...existing code... */}</>;
 }
 
 const styles = StyleSheet.create({

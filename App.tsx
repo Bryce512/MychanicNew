@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { StatusBar } from "expo-status-bar";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { AuthProvider } from "./app/contexts/AuthContext";
@@ -18,7 +17,6 @@ export default function App() {
         <BluetoothProvider>
           <DiagnosticsProviderWrapper>
             <NavigationContainer>
-              <StatusBar style="auto" />
               <AppNavigator />
             </NavigationContainer>
           </DiagnosticsProviderWrapper>

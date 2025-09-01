@@ -113,12 +113,6 @@ const Profile = () => {
       style={{ flex: 1, backgroundColor: colors.white }}
       edges={["bottom", "left", "right"]}
     >
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
-      />
-
       {/* Toast Banner */}
       {toastVisible && (
         <Animated.View

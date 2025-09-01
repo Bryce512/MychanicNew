@@ -263,9 +263,6 @@ const VehicleForm: React.FC<VehicleFormProps> = ({
 
   return (
     <ScrollView contentContainerStyle={vehicleFormStyles.container}>
-      <Text style={vehicleFormStyles.title}>
-        {isEdit ? "Edit Vehicle Info" : "Add Vehicle"}
-      </Text>
 
       {/* Image Picker and Display */}
       <View style={vehicleFormStyles.imageSection}>
