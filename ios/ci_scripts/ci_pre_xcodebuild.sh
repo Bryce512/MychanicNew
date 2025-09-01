@@ -8,26 +8,60 @@ set -e  # Exit on any error
 echo "🚀 Starting pre-build script for Xcode Cloud"
 
 # Get the current directory and navigate to project root
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 echo "📁 Script directory: $SCRIPT_DIR"
 echo "📁 Project root: $PROJECT_ROOT"
+echo "📁 Current working directory: $(pwd)"
 
+# Navigate to project root (repository root)
 cd "$PROJECT_ROOT"
+
+echo "📁 Changed to project root: $(pwd)"
 
 # Verify we're in the right directory
 if [ ! -f "package.json" ]; then
     echo "❌ Error: package.json not found. Current directory: $(pwd)"
+    echo "📋 Directory contents:"
+    ls -la
     exit 1
 fi
 
+# Ensure Node.js and npm are available (should be installed by post-clone script)
+if ! command -v node >/dev/null 2>&1; then
+    echo "❌ Error: Node.js not found. Post-clone script should have installed it."
+    exit 1
+fi
+
+if ! command -v npm >/dev/null 2>&1; then
+    echo "❌ Error: npm not found. Post-clone script should have installed it."
+    exit 1
+fi
+
+echo "✅ Node.js version: $(node --version)"
+echo "✅ npm version: $(npm --version)"
+
 # Install Node.js dependencies
 echo "📦 Installing Node.js dependencies..."
-npm ci
+npm ci --prefer-offline --no-audit
+
+# Check if Expo CLI is available, install if needed
+if ! command -v expo >/dev/null 2>&1; then
+    echo "📦 Installing Expo CLI..."
+    npm install -g @expo/cli@latest
+fi
+
+echo "✅ Expo CLI version: $(expo --version)"
+
+# Run Expo prebuild to ensure iOS project is up to date
+echo "🔧 Running Expo prebuild..."
+expo prebuild --platform ios --clear
 
 # Navigate to iOS directory
 cd ios
+
+echo "📁 Changed to iOS directory: $(pwd)"
 
 # Verify Podfile exists
 if [ ! -f "Podfile" ]; then
