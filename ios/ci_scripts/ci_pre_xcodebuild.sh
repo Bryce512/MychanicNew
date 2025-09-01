@@ -46,17 +46,19 @@ echo "✅ npm version: $(npm --version)"
 echo "📦 Installing Node.js dependencies..."
 npm ci --prefer-offline --no-audit
 
-# Check if Expo CLI is available, install if needed
+# Install Expo CLI locally if not available globally
+echo "📦 Ensuring Expo CLI is available..."
 if ! command -v expo >/dev/null 2>&1; then
-    echo "📦 Installing Expo CLI..."
-    npm install -g @expo/cli@latest
+    echo "Installing Expo CLI locally..."
+    npm install @expo/cli@latest
 fi
 
-echo "✅ Expo CLI version: $(expo --version)"
+# Use npx to run expo (works with both global and local installations)
+echo "✅ Expo CLI version: $(npx expo --version)"
 
 # Run Expo prebuild to ensure iOS project is up to date
 echo "🔧 Running Expo prebuild..."
-expo prebuild --platform ios --clear
+npx expo prebuild --platform ios --clear
 
 # Navigate to iOS directory
 cd ios

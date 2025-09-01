@@ -33,21 +33,31 @@ echo "✅ Found package.json in repository root"
 
 # Install Node.js if not available (Xcode Cloud might not have it pre-installed)
 if ! command -v node >/dev/null 2>&1; then
-    echo "📦 Installing Node.js via Homebrew..."
+    echo "📦 Installing Node.js..."
     
-    # Check if Homebrew is available
-    if ! command -v brew >/dev/null 2>&1; then
-        echo "📦 Installing Homebrew..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
-        eval "$(/opt/homebrew/bin/brew shellenv)"
+    # Try using Node Version Manager first (more reliable in CI)
+    if ! command -v nvm >/dev/null 2>&1; then
+        echo "Installing NVM..."
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
     fi
     
-    # Install Node.js
-    brew install node
+    # Install latest LTS Node.js
+    nvm install --lts
+    nvm use --lts
     
-    # Update PATH
-    export PATH="/opt/homebrew/bin:$PATH"
+    # If NVM fails, try direct download
+    if ! command -v node >/dev/null 2>&1; then
+        echo "NVM failed, trying direct Node.js installation..."
+        mkdir -p "$HOME/node"
+        cd "$HOME/node"
+        curl -L https://nodejs.org/dist/v20.18.0/node-v20.18.0-darwin-x64.tar.gz | tar -xz --strip-components=1
+        export PATH="$HOME/node/bin:$PATH"
+        echo 'export PATH="$HOME/node/bin:$PATH"' >> ~/.bash_profile
+        echo 'export PATH="$HOME/node/bin:$PATH"' >> ~/.zshrc
+        cd "$REPO_ROOT"
+    fi
 fi
 
 # Verify Node.js installation
