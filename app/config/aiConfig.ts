@@ -5,8 +5,11 @@
 
 export const AI_CONFIG = {
   // OpenAI API Configuration
-  OPENAI_API_KEY:
-    "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", // Add your OpenAI API key here
+  // Try multiple sources: Expo env, native iOS env, or fallback
+  OPENAI_API_KEY: 
+    process.env.EXPO_PUBLIC_OPENAI_API_KEY || 
+    process.env.OPENAI_API_KEY || 
+    "", // Read from environment variable
   OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
 
   // Model settings - Start with Mini, upgrade to 4o later if needed
