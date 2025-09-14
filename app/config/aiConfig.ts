@@ -6,10 +6,8 @@
 export const AI_CONFIG = {
   // OpenAI API Configuration
   // Try multiple sources: Expo env, native iOS env, or fallback
-  OPENAI_API_KEY: 
-    process.env.EXPO_PUBLIC_OPENAI_API_KEY || 
-    process.env.OPENAI_API_KEY || 
-    "", // Read from environment variable
+  OPENAI_API_KEY:
+    process.env.EXPO_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "", // Read from environment variable
   OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
 
   // Model settings - Start with Mini, upgrade to 4o later if needed

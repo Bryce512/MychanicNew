@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import "dotenv/config";
 
 export default {
   expo: {
@@ -12,24 +12,28 @@ export default {
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
-      backgroundColor: "#003566"
+      backgroundColor: "#003566",
     },
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.bryce512.Mychanic",
       googleServicesFile: "./GoogleService-Info.plist",
       infoPlist: {
-        NSBluetoothAlwaysUsageDescription: "This app uses Bluetooth to connect to your OBD-II device.",
-        NSBluetoothPeripheralUsageDescription: "This app uses Bluetooth to connect to your OBD-II device.",
-        NSLocationWhenInUseUsageDescription: "This app uses location to find nearby mechanics and services.",
-        NSLocationAlwaysAndWhenInUseUsageDescription: "This app uses location to find nearby mechanics and services.",
-        UIBackgroundModes: ["bluetooth-central"]
-      }
+        NSBluetoothAlwaysUsageDescription:
+          "This app uses Bluetooth to connect to your OBD-II device.",
+        NSBluetoothPeripheralUsageDescription:
+          "This app uses Bluetooth to connect to your OBD-II device.",
+        NSLocationWhenInUseUsageDescription:
+          "This app uses location to find nearby mechanics and services.",
+        NSLocationAlwaysAndWhenInUseUsageDescription:
+          "This app uses location to find nearby mechanics and services.",
+        UIBackgroundModes: ["bluetooth-central"],
+      },
     },
     android: {
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#003566"
+        backgroundColor: "#003566",
       },
       edgeToEdgeEnabled: true,
       package: "com.bryce512.Mychanic",
@@ -40,11 +44,11 @@ export default {
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
-      ]
+        "android.permission.ACCESS_COARSE_LOCATION",
+      ],
     },
     web: {
-      favicon: "./assets/favicon.png"
+      favicon: "./assets/favicon.png",
     },
     plugins: [
       "@react-native-firebase/app",
@@ -53,22 +57,29 @@ export default {
       [
         "expo-location",
         {
-          locationAlwaysAndWhenInUsePermission: "Allow Mychanic to use your location to find nearby mechanics and services.",
-          locationAlwaysPermission: "Allow Mychanic to use your location to find nearby mechanics and services.",
-          locationWhenInUsePermission: "Allow Mychanic to use your location to find nearby mechanics and services."
-        }
+          locationAlwaysAndWhenInUsePermission:
+            "Allow Mychanic to use your location to find nearby mechanics and services.",
+          locationAlwaysPermission:
+            "Allow Mychanic to use your location to find nearby mechanics and services.",
+          locationWhenInUsePermission:
+            "Allow Mychanic to use your location to find nearby mechanics and services.",
+        },
       ],
       [
         "expo-build-properties",
         {
           ios: {
             infoPlist: {
-              NSBluetoothAlwaysUsageDescription: "This app uses Bluetooth to connect to your OBD-II device.",
-              NSBluetoothPeripheralUsageDescription: "This app uses Bluetooth to connect to your OBD-II device.",
-              NSLocationWhenInUseUsageDescription: "This app uses location to find nearby mechanics and services.",
-              NSLocationAlwaysAndWhenInUseUsageDescription: "This app uses location to find nearby mechanics and services.",
-              UIBackgroundModes: ["bluetooth-central"]
-            }
+              NSBluetoothAlwaysUsageDescription:
+                "This app uses Bluetooth to connect to your OBD-II device.",
+              NSBluetoothPeripheralUsageDescription:
+                "This app uses Bluetooth to connect to your OBD-II device.",
+              NSLocationWhenInUseUsageDescription:
+                "This app uses location to find nearby mechanics and services.",
+              NSLocationAlwaysAndWhenInUseUsageDescription:
+                "This app uses location to find nearby mechanics and services.",
+              UIBackgroundModes: ["bluetooth-central"],
+            },
           },
           android: {
             permissions: [
@@ -77,16 +88,16 @@ export default {
               "android.permission.BLUETOOTH_CONNECT",
               "android.permission.BLUETOOTH_SCAN",
               "android.permission.ACCESS_FINE_LOCATION",
-              "android.permission.ACCESS_COARSE_LOCATION"
-            ]
-          }
-        }
+              "android.permission.ACCESS_COARSE_LOCATION",
+            ],
+          },
+        },
       ],
-      "react-native-ble-plx"
+      "react-native-ble-plx",
     ],
     extra: {
       // This makes environment variables available at runtime
       EXPO_PUBLIC_OPENAI_API_KEY: process.env.EXPO_PUBLIC_OPENAI_API_KEY,
-    }
-  }
+    },
+  },
 };
