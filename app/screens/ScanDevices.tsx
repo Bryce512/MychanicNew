@@ -1,58 +1,126 @@
 /* eslint-disable no-bitwise */
+
 import React, { useState, useEffect, useCallback } from "react";
-import { StatusBar } from "react-native";
 import {
   View,
-  StyleSheet,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
-  ActivityIndicator,
   Platform,
   Alert,
+  SafeAreaView,
+  StyleSheet,
   PermissionsAndroid,
+  StatusBar,
+  ActivityIndicator,
 } from "react-native";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import {
-  Text,
-  Card,
   Button,
-  IconButton,
+  Surface,
+  Text,
   Divider,
   List,
-  Surface,
-  useTheme,
+  IconButton,
+  Card,
 } from "react-native-paper";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import { useFocusEffect } from "@react-navigation/native";
+import { useNavigation, useTheme } from "@react-navigation/native";
 import { pidCommands } from "../services/pidCommands";
 import BluetoothDeviceSelector from "../components/BluetoothDeviceSelector";
 import { useBluetooth } from "../contexts/BluetoothContext";
-import { useEffect as useReactEffect, useState as useReactState } from "react";
 import firebaseService from "../services/firebaseService";
 import BleManager from "react-native-ble-manager";
 
 const ScanDevicesScreen = () => {
+  // Check Bluetooth status before scanning
+  const checkBluetoothAndStartScan = async () => {
+    try {
+      // On Android, check Bluetooth status
+      if (Platform.OS === "android") {
+        try {
+          const isEnabled = await BleManager.checkState();
+          if (isEnabled !== "on") {
+            Alert.alert(
+              "Bluetooth Disabled",
+              "Please enable Bluetooth to scan for devices."
+            );
+            return;
+          }
+        } catch (error) {
+          if (error && typeof error === "object" && "message" in error) {
+            console.error(
+              `Error checking Bluetooth state: ${
+                (error as { message: string }).message
+              }`
+            );
+          } else {
+            console.error(
+              `Error checking Bluetooth state: ${JSON.stringify(error)}`
+            );
+          }
+        }
+      }
+      // If we get here, Bluetooth should be on
+      console.log(
+        "Bluetooth is on. Setting showDeviceSelector to true and starting scan."
+      );
+      setShowDeviceSelector(true);
+      setDiscoveredDevices([]);
+      startScan(selectedVehicleId ?? undefined);
+    } catch (error) {
+      if (error && typeof error === "object" && "message" in error) {
+        console.error(
+          `Error checking Bluetooth: ${(error as { message: string }).message}`
+        );
+      } else {
+        console.error(`Error checking Bluetooth: ${JSON.stringify(error)}`);
+      }
+    }
+  };
+  // Check Bluetooth status before scanning
+  // (Removed duplicate checkBluetoothAndStartScan definition)
+
+  const theme = useTheme();
+  const navigation = useNavigation();
+  const {
+    voltage,
+    isScanning,
+    isConnected,
+    deviceId,
+    deviceName,
+    discoveredDevices,
+    setDiscoveredDevices,
+    startScan,
+    sendCommand,
+    connectToDevice,
+    disconnectDevice,
+    robustReconnect,
+    showAllDevices,
+    verifyConnection,
+    rememberedDevice,
+    connectToRememberedDevice,
+    fetchVoltage,
+  } = useBluetooth();
+
   // Wrapper to support passing vehicleId to context connectToDevice
   function connectToDeviceWithVehicle(device: any, vehicleId: string | null) {
-    // @ts-ignore
-    if (typeof connectToDevice === "function" && connectToDevice.length > 1) {
-      // Our patched context version
-      return connectToDevice(device);
-    } else {
-      // Fallback for original signature
-      return connectToDevice(device);
-      // StatusBar for all screens except Home
-      return <>{/* ...existing code... */}</>;
-    }
+    // Always pass vehicleId to context
+    return connectToDevice(vehicleId ?? undefined);
   }
 
   // Vehicle selection state
-  const [vehicles, setVehicles] = useReactState<any[]>([]);
-  const [selectedVehicleId, setSelectedVehicleId] = useReactState<
-    string | null
-  >(null);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(
+    null
+  );
+  // Local state for device selector modal
+  const [showDeviceSelector, setShowDeviceSelector] = useState(false);
+  const { getCurrentVoltage, getEngineRPM } = pidCommands();
+  const [rpm, setRpm] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+
   // Fetch vehicles for dropdown
-  useReactEffect(() => {
+  useEffect(() => {
     const fetchVehicles = async () => {
       const user = firebaseService.getCurrentUser();
       if (user) {
@@ -65,10 +133,22 @@ const ScanDevicesScreen = () => {
     };
     fetchVehicles();
   }, []);
+
+  // Check Bluetooth status before scanning
+  // (Removed duplicate checkBluetoothAndStartScan definition)
+
+  // Check Bluetooth status before scanning
+  // (Removed duplicate checkBluetoothAndStartScan definition)
+
   // Vehicle selector dropdown UI
   const renderVehicleDropdown = () => (
     <View style={{ margin: 16 }}>
-      <Text variant="titleSmall">Select Vehicle</Text>
+      <Text
+        variant="titleSmall"
+        style={{ color: theme.colors.primary, fontWeight: "bold" }}
+      >
+        Select Vehicle
+      </Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -79,54 +159,130 @@ const ScanDevicesScreen = () => {
             key={vehicle.id}
             style={{
               padding: 10,
+              paddingVertical: 12,
+              paddingHorizontal: 18,
               backgroundColor:
                 selectedVehicleId === vehicle.id
                   ? theme.colors.primary
-                  : "#eee",
+                  : theme.colors.card,
               borderRadius: 8,
-              marginRight: 8,
+              marginRight: 10,
+              borderWidth: selectedVehicleId === vehicle.id ? 2 : 1,
+              borderColor:
+                selectedVehicleId === vehicle.id
+                  ? theme.colors.primary
+                  : theme.colors.border,
+              shadowColor: theme.colors.primary,
+              shadowOpacity: selectedVehicleId === vehicle.id ? 0.15 : 0.05,
+              shadowRadius: 4,
             }}
             onPress={() => setSelectedVehicleId(vehicle.id)}
           >
             <Text
               style={{
-                color: selectedVehicleId === vehicle.id ? "#fff" : "#333",
+                color:
+                  selectedVehicleId === vehicle.id ? "#fff" : theme.colors.text,
+                fontWeight: "600",
               }}
             >
-              {vehicle.name}
+              {vehicle.name || "Vehicle"}
             </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
     </View>
   );
-  const theme = useTheme();
-  const navigation = useNavigation();
-  const {
-    voltage,
-    isScanning,
-    isConnected,
-    deviceId,
-    deviceName,
-    discoveredDevices,
-    setDiscoveredDevices,
-    showDeviceSelector,
-    setShowDeviceSelector,
-    startScan,
-    sendCommand,
-    connectToDevice,
-    disconnectDevice,
-    robustReconnect,
-    showAllDevices,
-    verifyConnection, // Add this to your context exports
-    rememberedDevice, // Get this from context instead of local state
-    connectToRememberedDevice, // Add this to your context exports
-    fetchVoltage,
-  } = useBluetooth();
-
-  const { getCurrentVoltage, getEngineRPM } = pidCommands();
-  const [rpm, setRpm] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
+  // Main render
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={theme.colors.background}
+      />
+      {renderVehicleDropdown()}
+      <Button
+        mode="contained"
+        style={{ margin: 16, backgroundColor: theme.colors.primary }}
+        onPress={checkBluetoothAndStartScan}
+      >
+        Scan for Devices
+      </Button>
+      {/* Device Selector Modal */}
+      {showDeviceSelector && (
+        <BluetoothDeviceSelector
+          visible={showDeviceSelector}
+          onClose={() => setShowDeviceSelector(false)}
+          onSelectDevice={(device) => {
+            connectToDeviceWithVehicle(device, selectedVehicleId);
+            setShowDeviceSelector(false);
+          }}
+          devices={discoveredDevices}
+          isScanning={isScanning}
+          onScanAgain={checkBluetoothAndStartScan}
+        />
+      )}
+      {/* Connection Status */}
+      <View style={{ margin: 16 }}>
+        <Text style={{ color: theme.colors.text, fontWeight: "bold" }}>
+          {isConnected
+            ? `Connected to ${deviceName || deviceId}`
+            : "Not Connected"}
+        </Text>
+      </View>
+      {/* Debug/Reset Button */}
+      <TouchableOpacity
+        onPress={async () => {
+          try {
+            if (isConnected) {
+              Alert.alert(
+                "Reset Connection",
+                "This will disconnect and reconnect to the remembered device.",
+                [
+                  {
+                    text: "Cancel",
+                    style: "cancel",
+                  },
+                  {
+                    text: "OK",
+                    onPress: async () => {
+                      await disconnectDevice();
+                      // Reconnect with clean state
+                      if (rememberedDevice) {
+                        const success = await connectToRememberedDevice();
+                        if (success) {
+                          Alert.alert(
+                            "Reconnected",
+                            "Connection has been re-established with proper service discovery.",
+                            [{ text: "OK" }]
+                          );
+                        } else {
+                          Alert.alert(
+                            "Reconnection Failed",
+                            "Could not reconnect to the device. Try scanning again.",
+                            [{ text: "OK" }]
+                          );
+                        }
+                      }
+                    },
+                  },
+                ]
+              );
+            } else {
+              Alert.alert("Not Connected", "Device is not currently connected");
+            }
+          } catch (error) {
+            console.error("Error during reset:", error);
+          }
+        }}
+      >
+        <View style={styles.debugButton}>
+          <MaterialCommunityIcons name="restart" size={20} color="#fff" />
+          <Text style={styles.debugButtonText}>Reset Connection</Text>
+        </View>
+      </TouchableOpacity>
+    </SafeAreaView>
+  );
+  // (Removed duplicate destructuring and hook calls after return)
 
   // Check connection status whenever the screen comes into focus
   useFocusEffect(
@@ -205,67 +361,7 @@ const ScanDevicesScreen = () => {
   };
 
   // Check Bluetooth status before scanning
-  const checkBluetoothAndStartScan = async () => {
-    try {
-      // On Android, check Bluetooth status
-      if (Platform.OS === "android") {
-        try {
-          const isEnabled = await BleManager.checkState();
-          if (isEnabled !== "on") {
-            Alert.alert(
-              "Bluetooth Disabled",
-              "Please enable Bluetooth to scan for devices.",
-              [
-                {
-                  text: "Cancel",
-                  style: "cancel",
-                },
-                {
-                  text: "Settings",
-                  onPress: () => {
-                    // Open Bluetooth settings
-                    BleManager.enableBluetooth()
-                      .then(() => {
-                        setTimeout(() => startScan(), 1000);
-                      })
-                      .catch((err) => {
-                        console.error(
-                          `Failed to enable Bluetooth: ${err.message}`
-                        );
-                      });
-                  },
-                },
-              ]
-            );
-            return;
-          }
-        } catch (error) {
-          if (error && typeof error === "object" && "message" in error) {
-            console.error(
-              `Error checking Bluetooth state: ${
-                (error as { message: string }).message
-              }`
-            );
-          } else {
-            console.error(
-              `Error checking Bluetooth state: ${JSON.stringify(error)}`
-            );
-          }
-        }
-      }
-
-      // If we get here, Bluetooth should be on
-      startScan();
-    } catch (error) {
-      if (error && typeof error === "object" && "message" in error) {
-        console.error(
-          `Error checking Bluetooth: ${(error as { message: string }).message}`
-        );
-      } else {
-        console.error(`Error checking Bluetooth: ${JSON.stringify(error)}`);
-      }
-    }
-  };
+  // (Removed duplicate checkBluetoothAndStartScan definition)
 
   // Check permissions on component mount
   useEffect(() => {
@@ -452,6 +548,12 @@ const ScanDevicesScreen = () => {
       )}
 
       {/* Import the device selector component */}
+      <>
+        {console.log(
+          "Rendering BluetoothDeviceSelector. showDeviceSelector:",
+          showDeviceSelector
+        )}
+      </>
       <BluetoothDeviceSelector
         visible={showDeviceSelector}
         onClose={() => setShowDeviceSelector(false)}

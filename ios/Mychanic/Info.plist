@@ -63,7 +63,9 @@
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>Allow Mychanic to use your location to find nearby mechanics and services.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your microphone</string>
+    <string>This app needs access to your microphone for speech recognition to convert your voice to text</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>This app needs access to speech recognition to convert your voice to text for diagnostic assistance</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>Mychanic needs permission to save photos to your library</string>
     <key>NSPhotoLibraryUsageDescription</key>

@@ -43,9 +43,9 @@ export default function HomeScreen() {
               size="lg"
             />
             <Button
-              title="Join as a Mechanic"
-              onPress={() => navigation.navigate("MechanicSignup" as never)}
-              variant="outline"
+              title="Mechanic Dashboard"
+              onPress={() => navigation.navigate("MechanicDashboard" as never)}
+              variant="secondary"
               size="lg"
             />
           </View>

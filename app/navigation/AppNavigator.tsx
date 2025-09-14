@@ -21,6 +21,8 @@ import SignupScreen from "../screens/Signup";
 import EditVehicleInfoScreen from "../screens/EditVehicleInfo";
 import AddProfileScreen from "../screens/AddProfile";
 import EditProfileScreen from "../screens/EditProfile";
+import DiagnosticAssistantScreen from "../screens/DiagnosticChat";
+import MechanicDashboardScreen from "../screens/MechanicDashboard";
 
 export type RootStackParamList = {
   Main: undefined;
@@ -28,6 +30,8 @@ export type RootStackParamList = {
   Signup: undefined;
   BookAppointment: { mechanicId: number };
   DiagnosticsDetail: { userId: number; carId: number; diagnosticCode: string };
+  DiagnosticAssistant: undefined;
+  MechanicDashboard: undefined;
   ScanDevices: undefined;
   Profile: undefined;
   EditVehicleInfo: { vehicle: any; userId: string };
@@ -224,6 +228,16 @@ export default function AppNavigator() {
             name="EditProfile"
             component={EditProfileScreen}
             options={{ title: "Edit Profile" }}
+          />
+          <Stack.Screen
+            name="DiagnosticAssistant"
+            component={DiagnosticAssistantScreen}
+            options={{ title: "Diagnostic Assistant" }}
+          />
+          <Stack.Screen
+            name="MechanicDashboard"
+            component={MechanicDashboardScreen}
+            options={{ title: "Mechanic Dashboard" }}
           />
           {/* <Stack.Screen
             name="MechanicProfile"
