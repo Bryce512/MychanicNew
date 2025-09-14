@@ -63,7 +63,7 @@
       <EnvironmentVariables>
          <EnvironmentVariable
             key = "EXPO_PUBLIC_OPENAI_API_KEY"
-            value = "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"
+            value = "$(EXPO_PUBLIC_OPENAI_API_KEY)"
             isEnabled = "YES">
          </EnvironmentVariable>
       </EnvironmentVariables>
