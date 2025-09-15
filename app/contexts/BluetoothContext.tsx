@@ -29,7 +29,7 @@ interface BluetoothContextType {
   showDeviceSelector: boolean;
   setShowDeviceSelector: (show: boolean) => void;
   startScan: () => Promise<void>;
-  connectToDevice: (device: any) => Promise<boolean>;
+  connectToDevice: (device: any, vehicleId?: string) => Promise<boolean>;
   disconnectDevice: () => Promise<void>;
   sendCommand: (device: any, command: string) => Promise<string>;
   showAllDevices: () => Promise<void>;
@@ -108,18 +108,18 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
     bleConnectionHook.lastSuccessfulCommandTime,
   ]);
 
-  useEffect(() => {
-    // Try to reconnect automatically on app start
-    (async () => {
-      if (rememberedDevice) {
-        const connected = await connectToDevice(rememberedDevice);
-        if (connected) {
-          setDeviceId(rememberedDevice.id);
-          setIsConnected(true);
-        }
-      }
-    })();
-  }, [rememberedDevice]);
+  // useEffect(() => {
+  //   // Try to reconnect automatically on app start
+  //   (async () => {
+  //     if (rememberedDevice) {
+  //       const connected = await connectToDevice(rememberedDevice);
+  //       if (connected) {
+  //         setDeviceId(rememberedDevice.id);
+  //         setIsConnected(true);
+  //       }
+  //     }
+  //   })();
+  // }, [rememberedDevice]);
 
   // Monitor app state for background/foreground transitions
   useEffect(() => {
@@ -185,6 +185,20 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
     vehicleId?: string
   ): Promise<boolean> => {
     try {
+      // Add defensive logging to debug device object
+      logMessage(`Attempting to connect to device: ${JSON.stringify(device)}`);
+      logMessage(
+        `Device ID: ${device?.id}, Device Name: ${
+          device?.name || "Unnamed Device"
+        }`
+      );
+
+      // Validate device object
+      if (!device || !device.id) {
+        logMessage("❌ Invalid device object - missing ID");
+        return false;
+      }
+
       logMessage(`Connecting to ${device.name || "Unnamed Device"}...`);
       const success = await bleConnectionHook.connectToDevice(device);
 

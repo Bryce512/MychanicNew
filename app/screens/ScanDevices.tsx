@@ -66,7 +66,7 @@ const ScanDevicesScreen = () => {
       );
       setShowDeviceSelector(true);
       setDiscoveredDevices([]);
-      startScan(selectedVehicleId ?? undefined);
+      startScan();
     } catch (error) {
       if (error && typeof error === "object" && "message" in error) {
         console.error(
@@ -104,8 +104,8 @@ const ScanDevicesScreen = () => {
 
   // Wrapper to support passing vehicleId to context connectToDevice
   function connectToDeviceWithVehicle(device: any, vehicleId: string | null) {
-    // Always pass vehicleId to context
-    return connectToDevice(vehicleId ?? undefined);
+    // Pass device and vehicleId to context connectToDevice
+    return connectToDevice(device, vehicleId ?? undefined);
   }
 
   // Vehicle selection state

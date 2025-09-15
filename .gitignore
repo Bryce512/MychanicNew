@@ -34,6 +34,10 @@ yarn-error.*
 .env*.local
 .env
 
+# Configuration files with secrets
+ios/Config.local.xcconfig
+ios/*.local.xcconfig
+
 # typescript
 *.tsbuildinfo
 

@@ -1,0 +1,6 @@
+// Enhanced release configuration including environment variables
+#include "Pods-Mychanic.release.xcconfig"
+#include? "Config.local.xcconfig"
+
+// Environment variables will be read from Config.local.xcconfig
+// If Config.local.xcconfig doesn't exist, the variable will be empty

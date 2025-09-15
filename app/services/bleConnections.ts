@@ -74,6 +74,7 @@ export const useBleConnection = (options?: {
   const [responseCallback, setResponseCallback] = useState<
     ((data: string) => void) | null
   >(null);
+  
   const [discoveredDevices, setDiscoveredDevices] = useState<BluetoothDevice[]>(
     []
   );

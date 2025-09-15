@@ -1,0 +1,6 @@
+// Enhanced debug configuration including environment variables
+#include "Pods-Mychanic.debug.xcconfig"
+#include? "Config.local.xcconfig"
+
+// Environment variables will be read from Config.local.xcconfig
+// If Config.local.xcconfig doesn't exist, the variable will be empty
