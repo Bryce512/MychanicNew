@@ -920,18 +920,40 @@ export default function VehicleProfilesScreen() {
                           </Text>
                         )}
                       </View>
-                      <Button
-                        title="View Full Diagnostics"
-                        onPress={() => handleViewDiagnosticDetails(navigation)}
-                        style={styles.viewDetailsButton}
-                        icon={
-                          <Feather
-                            name="arrow-right"
-                            size={16}
-                            color={colors.white}
-                          />
-                        }
-                      />
+                      <View style={styles.diagnosticsButtonContainer}>
+                        <Button
+                          title="View Full Diagnostic"
+                          onPress={() =>
+                            handleViewDiagnosticDetails(navigation)
+                          }
+                          style={[
+                            styles.viewDetailsButton,
+                            { marginBottom: 12 },
+                          ]}
+                          icon={
+                            <Feather
+                              name="arrow-right"
+                              size={16}
+                              color={colors.white}
+                            />
+                          }
+                        />
+                        <Button
+                          title="View Live Data"
+                          onPress={() => navigation.navigate("LiveData")}
+                          variant="outline"
+                          style={styles.viewDetailsButton}
+                          icon={
+                            <Feather
+                              name="activity"
+                              size={16}
+                              color={
+                                isDark ? colors.white : colors.primary[500]
+                              }
+                            />
+                          }
+                        />
+                      </View>
                     </CardContent>
                   </Card>
                 </View>

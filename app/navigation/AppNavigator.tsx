@@ -23,6 +23,7 @@ import AddProfileScreen from "../screens/AddProfile";
 import EditProfileScreen from "../screens/EditProfile";
 import DiagnosticAssistantScreen from "../screens/DiagnosticChat";
 import MechanicDashboardScreen from "../screens/MechanicDashboard";
+import LiveDataScreen from "../screens/LiveData";
 
 export type RootStackParamList = {
   Main: undefined;
@@ -40,6 +41,7 @@ export type RootStackParamList = {
   VehicleProfiles: undefined;
   AddProfile: undefined;
   EditProfile: undefined;
+  LiveData: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -238,6 +240,11 @@ export default function AppNavigator() {
             name="MechanicDashboard"
             component={MechanicDashboardScreen}
             options={{ title: "Mechanic Dashboard" }}
+          />
+          <Stack.Screen
+            name="LiveData"
+            component={LiveDataScreen}
+            options={{ title: "Live Data" }}
           />
           {/* <Stack.Screen
             name="MechanicProfile"

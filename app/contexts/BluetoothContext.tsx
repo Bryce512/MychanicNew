@@ -12,7 +12,6 @@ import { useBleConnection } from "../services/bleConnections";
 import { AppState } from "react-native";
 import { Device } from "react-native-ble-plx";
 import { obdDataFunctions } from "../services/obdDataCollection";
-import BluetoothManager from "../services/BluetoothManager";
 
 // Define the shape of our context
 interface BluetoothContextType {
@@ -42,7 +41,6 @@ interface BluetoothContextType {
   enhancedVerifyConnection: (deviceId: string) => Promise<boolean>;
   fetchVoltage: () => Promise<string | null>;
   fetchRPM: () => Promise<number | null>;
-  // connectToBondedDeviceIfAvailable: () => Promise<string | null>;
 }
 
 // Create the context
@@ -76,10 +74,6 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
   const [showDeviceSelector, setShowDeviceSelector] = useState(
     bleConnectionHook.showDeviceSelector
   );
-
-  // const connectToBondedDeviceIfAvailable =
-  //   bleConnectionHook.connectToBondedDeviceIfAvailable;
-
   const [rememberedDevice, setRememberedDevice] = useState(
     bleConnectionHook.rememberedDevice
   );
@@ -108,44 +102,31 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
     bleConnectionHook.lastSuccessfulCommandTime,
   ]);
 
+  // Monitor app state for background/foreground transitions - DISABLED to prevent auto-reconnects
   // useEffect(() => {
-  //   // Try to reconnect automatically on app start
-  //   (async () => {
-  //     if (rememberedDevice) {
-  //       const connected = await connectToDevice(rememberedDevice);
-  //       if (connected) {
-  //         setDeviceId(rememberedDevice.id);
-  //         setIsConnected(true);
-  //       }
+  //   const subscription = AppState.addEventListener("change", (nextAppState) => {
+  //     if (nextAppState === "active") {
+  //       verifyAndReconnectIfNeeded();
   //     }
-  //   })();
-  // }, [rememberedDevice]);
+  //   });
 
-  // Monitor app state for background/foreground transitions
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (nextAppState) => {
-      if (nextAppState === "active") {
-        verifyAndReconnectIfNeeded();
-      }
-    });
+  //   return () => subscription.remove();
+  // }, [deviceId, isConnected]);
 
-    return () => subscription.remove();
-  }, [deviceId, isConnected]);
+  // Verify connection periodically - DISABLED to prevent auto-reconnects
+  // useEffect(() => {
+  //   if (isConnected && deviceId) {
+  //     const interval = setInterval(async () => {
+  //       const stillConnected = await verifyConnection(deviceId);
+  //       if (!stillConnected && rememberedDevice) {
+  //         logMessage("Connection lost, attempting reconnection from context");
+  //         connectToRememberedDevice();
+  //       }
+  //     }, 30000);
 
-  // Verify connection periodically
-  useEffect(() => {
-    if (isConnected && deviceId) {
-      const interval = setInterval(async () => {
-        const stillConnected = await verifyConnection(deviceId);
-        if (!stillConnected && rememberedDevice) {
-          logMessage("Connection lost, attempting reconnection from context");
-          connectToRememberedDevice();
-        }
-      }, 30000);
-
-      return () => clearInterval(interval);
-    }
-  }, [isConnected, deviceId, rememberedDevice]);
+  //     return () => clearInterval(interval);
+  //   }
+  // }, [isConnected, deviceId, rememberedDevice]);
 
   // Enhanced version of verifyConnection that updates context state
   const verifyConnection = async (deviceId: string): Promise<boolean> => {
@@ -411,7 +392,6 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
     connectToDevice,
     disconnectDevice: disconnectDevice,
     connectToRememberedDevice,
-    // connectToBondedDeviceIfAvailable,
     verifyConnection,
     logMessage,
     robustReconnect,

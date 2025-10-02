@@ -285,6 +285,8 @@ const ScanDevicesScreen = () => {
   // (Removed duplicate destructuring and hook calls after return)
 
   // Check connection status whenever the screen comes into focus
+  // DISABLED: Causing connection resets - auto-connect happens at app startup
+  /*
   useFocusEffect(
     React.useCallback(() => {
       console.log("ScanDevicesScreen focused");
@@ -305,8 +307,11 @@ const ScanDevicesScreen = () => {
       };
     }, [isConnected, rememberedDevice])
   );
+  */
 
   // Verify connection when screen is focused
+  // DISABLED: Causing connection resets - app-level connection management is sufficient
+  /*
   useFocusEffect(
     useCallback(() => {
       // Verify connection when screen is focused
@@ -335,6 +340,7 @@ const ScanDevicesScreen = () => {
       };
     }, [isConnected, deviceId])
   );
+  */
 
   // Fetch data from OBD-II device
   const fetchData = async () => {

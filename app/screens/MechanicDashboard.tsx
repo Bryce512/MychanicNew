@@ -25,27 +25,11 @@ export default function MechanicDashboard() {
     container: {
       flex: 1,
       backgroundColor: isDark ? colors.gray[900] : colors.gray[50],
-    },
-    header: {
-      padding: 20,
-      backgroundColor: colors.primary[500],
-    },
-    headerTitle: {
-      fontSize: 24,
-      fontWeight: "bold",
-      color: colors.white,
-      textAlign: "center",
-    },
-    headerSubtitle: {
-      fontSize: 14,
-      color: colors.white,
-      textAlign: "center",
-      marginTop: 4,
-      opacity: 0.9,
+      paddingTop: 0,
     },
     content: {
       flex: 1,
-      padding: 16,
+      padding: 0,
     },
     statsContainer: {
       flexDirection: "row",
@@ -214,13 +198,6 @@ export default function MechanicDashboard() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mechanic Dashboard</Text>
-        <Text style={styles.headerSubtitle}>
-          Welcome to your diagnostic workspace
-        </Text>
-      </View>
-
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Stats Overview */}
         <View style={styles.statsContainer}>

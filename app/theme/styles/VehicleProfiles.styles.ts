@@ -366,6 +366,11 @@ export const vehicleProfileStyles = StyleSheet.create({
     marginTop: 16,
     alignSelf: "center",
   },
+  diagnosticsButtonContainer: {
+    marginTop: 16,
+    alignItems: "center",
+    gap: 12,
+  },
   textLight: {
     color: colors.white,
   },

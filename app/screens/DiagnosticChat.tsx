@@ -415,23 +415,6 @@ Would you like me to explain any of these steps in more detail, or do you have q
       flex: 1,
       backgroundColor: isDark ? colors.gray?.[900] : colors.gray?.[50],
     },
-    header: {
-      padding: 20,
-      backgroundColor: colors.primary?.[500],
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-    },
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: "bold",
-      color: colors.white,
-    },
-    headerSubtitle: {
-      fontSize: 12,
-      color: colors.white,
-      opacity: 0.9,
-    },
     content: {
       flex: 1,
     },
@@ -740,12 +723,6 @@ Would you like me to explain any of these steps in more detail, or do you have q
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Diagnostic Assistant</Text>
-          <Text style={styles.headerSubtitle}>AI-Powered Analysis</Text>
-        </View>
-      </View>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}

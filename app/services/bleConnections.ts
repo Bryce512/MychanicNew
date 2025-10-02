@@ -11,18 +11,17 @@ import { BleManager as BlePlxManager, Device } from "react-native-ble-plx";
 import base64 from "react-native-base64";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Buffer } from "buffer";
-import BluetoothManager from "./BluetoothManager";
 
 // Constants
 const { BleManager: BleManagerModule } = NativeModules;
-const bleEmitter = new NativeEventEmitter(NativeModules.BleManager);
+// Fix NativeEventEmitter warning by ensuring proper module reference
+const bleEmitter = new NativeEventEmitter(BleManagerModule);
 const SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb";
 const WRITE_UUID = "0000fff2-0000-1000-8000-00805f9b34fb";
 const READ_UUID = "0000fff1-0000-1000-8000-00805f9b34fb";
 const REMEMBERED_DEVICE_KEY = "@MychanicApp:rememberedDevice";
 const blePlxManager = new BlePlxManager();
 const TARGET_DEVICE_NAME = "OBDII"; // Change to your device's Bluetooth name
-const TARGET_DEVICE_ID = "53fc0537-e506-0bcf-81ec-e757067e9ed3"; // Change to your device's ID
 
 // Types
 export interface BluetoothDevice {
@@ -74,7 +73,9 @@ export const useBleConnection = (options?: {
   const [responseCallback, setResponseCallback] = useState<
     ((data: string) => void) | null
   >(null);
-  
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [isLoadingRemembered, setIsLoadingRemembered] = useState(false);
+
   const [discoveredDevices, setDiscoveredDevices] = useState<BluetoothDevice[]>(
     []
   );
@@ -98,22 +99,29 @@ export const useBleConnection = (options?: {
   // In the useEffect
   // Only call loadRememberedDevice once on mount
   useEffect(() => {
+    if (isInitialized) {
+      logMessage("[BLE] Already initialized, skipping");
+      return;
+    }
+
     logMessage(
       "[BLE] useEffect mount: initializing BLE and loading remembered device"
     );
-    initializeBLE(deviceId || "");
-    let didRun = false;
-    (async () => {
-      if (!didRun && !isConnected && !isScanning) {
-        logMessage("[BLE] Calling loadRememberedDevice (first mount)");
-        await loadRememberedDevice();
-        didRun = true;
-      } else {
+
+    const initialize = async () => {
+      try {
+        await initializeBLE("");
+        setIsInitialized(true);
+      } catch (error) {
         logMessage(
-          "[BLE] Skipping loadRememberedDevice: already connected or scanning"
+          `❌ Initialization failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`
         );
       }
-    })();
+    };
+
+    initialize();
     // Clean up listeners
     return () => {
       if (activeOperations.current === 0) {
@@ -391,49 +399,6 @@ export const useBleConnection = (options?: {
     }
   }
 
-  // async function connectToBondedDeviceIfAvailable() {
-  //   try {
-  //     // Retrieve bonded devices (Android only)
-  //     const bondedDevices = await BleManager.getBondedPeripherals();
-
-  //     console.log("Bonded devices:", bondedDevices);
-
-  //     // Find the target device by name or id
-  //     const targetDevice = bondedDevices.find(
-  //       (device) =>
-  //         device.name === TARGET_DEVICE_NAME || device.id === TARGET_DEVICE_ID
-  //     );
-
-  //     if (!targetDevice) {
-  //       console.log("No bonded target device found");
-  //       return null;
-  //     }
-
-  //     // Check if already connected (optional)
-  //     const connectedDevices = await BleManager.getConnectedPeripherals([]);
-  //     const isAlreadyConnected = connectedDevices.some(
-  //       (d) => d.id === targetDevice.id
-  //     );
-  //     if (isAlreadyConnected) {
-  //       console.log("Device already connected");
-  //       return targetDevice;
-  //     }
-
-  //     // Connect to the device
-  //     console.log(`Connecting to bonded device ${targetDevice.id}...`);
-  //     await BleManager.connect(targetDevice.id);
-  //     console.log("Connected!");
-
-  //     // Optional: retrieve services
-  //     await BleManager.retrieveServices(targetDevice.id);
-
-  //     return targetDevice;
-  //   } catch (error) {
-  //     console.error("Failed to connect to bonded device:", error);
-  //     return null;
-  //   }
-  // }
-
   const initializeBLE = async (deviceID: string) => {
     logMessage("🔄 Initializing Bluetooth module...");
 
@@ -454,8 +419,13 @@ export const useBleConnection = (options?: {
       const state = await BleManager.checkState();
       logMessage(`📱 Bluetooth state: ${state}`);
 
-      // setupAllBleListeners(deviceID);
-      await loadRememberedDevice();
+      // Set up listeners but don't load remembered device here
+      setupAllBleListeners(deviceID);
+
+      // Load remembered device only if not already connected
+      if (!isConnected) {
+        await loadRememberedDevice();
+      }
     } catch (error) {
       logMessage(
         `❌ Failed to initialize BLE: ${
@@ -567,6 +537,18 @@ export const useBleConnection = (options?: {
 
   // Load remembered device
   const loadRememberedDevice = async () => {
+    if (isLoadingRemembered) {
+      logMessage("⚠️ Already loading remembered device, skipping");
+      return null;
+    }
+
+    if (isConnected) {
+      logMessage("ℹ️ Already connected, skipping remembered device load");
+      return null;
+    }
+
+    setIsLoadingRemembered(true);
+
     try {
       logMessage("🔍 Checking for remembered device...");
       const deviceJson = await AsyncStorage.getItem(REMEMBERED_DEVICE_KEY);
@@ -620,6 +602,8 @@ export const useBleConnection = (options?: {
         }`
       );
       return null;
+    } finally {
+      setIsLoadingRemembered(false);
     }
   };
 
@@ -1403,6 +1387,5 @@ export const useBleConnection = (options?: {
 
     // Setters for discoveredDevices if needed externally
     setDiscoveredDevices,
-  //   connectToBondedDeviceIfAvailable,
   };
 };
