@@ -365,6 +365,7 @@ export const vehicleProfileStyles = StyleSheet.create({
   viewDetailsButton: {
     marginTop: 16,
     alignSelf: "center",
+    marginBottom: 20
   },
   diagnosticsButtonContainer: {
     marginTop: 16,

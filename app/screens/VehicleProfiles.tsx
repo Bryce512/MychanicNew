@@ -114,7 +114,7 @@ export default function VehicleProfilesScreen() {
         setLoading(true);
         const currentUser = firebaseService.getCurrentUser();
         if (currentUser) {
-          await firebaseService.ensureUserProfile(currentUser);
+          // await firebaseService.ensureUserProfile(currentUser);
           const userVehicles = await firebaseService.getVehicles(
             currentUser.uid
           );
@@ -926,10 +926,7 @@ export default function VehicleProfilesScreen() {
                           onPress={() =>
                             handleViewDiagnosticDetails(navigation)
                           }
-                          style={[
-                            styles.viewDetailsButton,
-                            { marginBottom: 12 },
-                          ]}
+                          style={styles.viewDetailsButton}
                           icon={
                             <Feather
                               name="arrow-right"

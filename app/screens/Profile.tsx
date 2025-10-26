@@ -66,7 +66,7 @@ const Profile = () => {
           const profile = await getUserProfile(user.uid);
           setProfile(profile);
         } catch (error) {
-          console.error("Error fetching profile:", error);
+          console.error("📋 Profile screen (initial): Error fetching profile:", error);
         } finally {
           setLoading(false);
         }
@@ -240,6 +240,33 @@ const Profile = () => {
                 />
                 <Text style={{ color: "white", fontWeight: "bold" }}>
                   Complete Profile
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: colors.gray[600],
+                  padding: 12,
+                  borderRadius: 8,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                onPress={async () => {
+                  if (user) {
+                    console.log('🔍 Running Firestore debug...');
+                    await debugFirestoreData(user.uid);
+                  }
+                }}
+              >
+                <Feather
+                  name="search"
+                  size={18}
+                  color="white"
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={{ color: "white", fontWeight: "bold" }}>
+                  Debug Database
                 </Text>
               </TouchableOpacity>
             </View>

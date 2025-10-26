@@ -1,67 +1,5 @@
+// Debug: Log all vehicles and their ownerId fields
 import storage from "@react-native-firebase/storage";
-// Upload vehicle image to Firebase Storage and return the download URL
-export const uploadVehicleImage = async (
-  userId: string,
-  vehicleId: string,
-  uri: string,
-  ext: string = "jpg"
-) => {
-  try {
-    const path = `user_uploads/${userId}/${vehicleId}.${ext}`;
-    const ref = storage().ref(path);
-    // Upload file from local uri
-    await ref.putFile(uri);
-    // Get download URL
-    const url = await ref.getDownloadURL();
-    return url;
-  } catch (error) {
-    console.error("Error uploading vehicle image:", error);
-    throw error;
-  }
-};
-// Update diagInfo for a specific vehicle
-export const updateVehicleDiagInfo = async (
-  userId: string,
-  vehicleId: string,
-  diagData: any
-) => {
-  const database = getDatabase();
-  const diagInfoRef = ref(
-    database,
-    `users/${userId}/vehicles/${vehicleId}/diagnosticData`
-  );
-  try {
-    // If mileage is present, update lastMileageUpdate
-    let dataToSet = { ...diagData };
-    if (typeof diagData.mileage !== "undefined") {
-      dataToSet.lastMileageUpdate = Date.now();
-    }
-    await set(diagInfoRef, dataToSet);
-    return true;
-  } catch (error) {
-    console.error("Error updating diagInfo:", error);
-    throw error;
-  }
-};
-// Fetch diagInfo for a specific vehicle
-export const getVehicleDiagInfo = async (userId: string, vehicleId: string) => {
-  const database = getDatabase();
-  const diagInfoRef = ref(
-    database,
-    `users/${userId}/vehicles/${vehicleId}/diagnosticData`
-  );
-  try {
-    const snapshot = await get(diagInfoRef);
-    if (snapshot.exists()) {
-      return snapshot.val();
-    }
-    return null;
-  } catch (error) {
-    console.error("Error fetching diagInfo:", error);
-    return null;
-  }
-};
-// firebaseService.ts
 import { initializeApp, getApp, getApps } from "@react-native-firebase/app";
 import {
   getAuth,
@@ -71,42 +9,50 @@ import {
   onAuthStateChanged,
 } from "@react-native-firebase/auth";
 import {
-  getDatabase,
-  ref,
-  set,
-  get,
-  update,
-  remove,
-  push,
-} from "@react-native-firebase/database";
+  getFirestore,
+  collection,
+  doc,
+  getDocs,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  addDoc,
+  query,
+  where,
+  serverTimestamp,
+  arrayUnion,
+  arrayRemove,
+  documentId,
+  getDoc,
+} from "@react-native-firebase/firestore";
 import type { FirebaseAuthTypes } from "@react-native-firebase/auth";
+import { auth } from "../../firebaseConfig";
 
 // Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAZ2Xk8Kkbc-0tdkJBqWhqNZie8Ls7cEnc",
   authDomain: "fluid-tangent-405719.firebaseapp.com",
-  databaseURL: "https://fluid-tangent-405719-default-rtdb.firebaseio.com",
   projectId: "fluid-tangent-405719",
   storageBucket: "fluid-tangent-405719.firebasestorage.app",
   messagingSenderId: "578434461817",
   appId: "1:578434461817:ios:5509bcf8e73151e2c524a8",
 };
 
+const app = getApp();
+const db = getFirestore(app);
+
 // Flag to track initialization status
 let isInitialized = false;
 
 // Initialize Firebase - get the existing app or create a new one
 export const initializeFirebase = async () => {
-  // If we've already initialized, return early to prevent duplicate initialization
   if (isInitialized) {
     console.log("Firebase already initialized by this service");
     return getApp();
   }
 
   try {
-    // Check if already initialized
     if (getApps().length === 0) {
-      // Only initialize if no apps exist
       initializeApp(firebaseConfig);
       console.log("Firebase initialized successfully");
     } else {
@@ -120,41 +66,134 @@ export const initializeFirebase = async () => {
   }
 };
 
-// Function to write data to the database
-export const writeData = (userId: string, name: string, email: string) => {
-  const database = getDatabase();
-  const userRef = ref(database, `users/${userId}`);
-
-  const userData = {
-    name: name,
-    email: email,
-  };
-
-  return set(userRef, userData)
-    .then(() => console.log("Data written successfully"))
-    .catch((error) => console.error("Error writing data:", error));
+// Upload vehicle image to Firebase Storage and return the download URL
+export const uploadVehicleImage = async (
+  userId: string,
+  vehicleId: string,
+  uri: string,
+  ext: string = "jpg"
+) => {
+  try {
+    const path = `user_uploads/${userId}/${vehicleId}.${ext}`;
+    const ref = storage().ref(path);
+    await ref.putFile(uri);
+    const url = await ref.getDownloadURL();
+    return url;
+  } catch (error) {
+    console.error("Error uploading vehicle image:", error);
+    throw error;
+  }
 };
 
-// Function to read data from the database
-export const readData = (userId: string) => {
-  const database = getDatabase();
-  const userRef = ref(database, `users/${userId}`);
+// Update diagInfo for a specific vehicle
+export const updateVehicleDiagInfo = async (
+  userId: string,
+  vehicleId: string,
+  diagData: any
+) => {
+  const db = getFirestore();
+  let dataToSet = { ...diagData };
+  if (typeof diagData.mileage !== "undefined") {
+    dataToSet.lastMileageUpdate = Date.now();
+  }
+  const vehicleRef = doc(db, "vehicles", vehicleId);
+  await updateDoc(vehicleRef, { diagnosticData: dataToSet });
+  return true;
+};
 
-  return get(userRef)
-    .then((snapshot) => {
-      if (snapshot.exists()) {
-        const userData = snapshot.val();
-        console.log(userData);
-        return userData;
-      } else {
-        console.log("No data available");
-        return null;
-      }
-    })
-    .catch((error) => {
-      console.error("Error reading data:", error);
-      throw error;
-    });
+// Fetch diagInfo for a specific vehicle
+export const getVehicleDiagInfo = async (userId: string, vehicleId: string) => {
+  const db = getFirestore();
+  const vehicleRef = doc(db, "vehicles", vehicleId);
+  const vehicleSnap = await getDoc(vehicleRef);
+  if (vehicleSnap.exists()) {
+    const vehicleData = vehicleSnap.data();
+    return vehicleData?.diagnosticData || null;
+  }
+  return null;
+};
+
+// Function to write user data to Firestore
+export const writeData = async (
+  userId: string,
+  name: string,
+  email: string
+) => {
+  const db = getFirestore();
+  const userData = {
+    profile: {
+      name: name,
+      email: email,
+    },
+    vehicleIds: [],
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+  const userRef = doc(db, "users", userId);
+  await setDoc(userRef, userData);
+  console.log("Data written successfully");
+  return true;
+};
+
+// Function to read user data from Firestore
+export const readData = async (userId: string) => {
+  const db = getFirestore();
+  const userRef = doc(db, "users", userId);
+  const userSnap = await getDoc(userRef);
+  if (userSnap.exists()) {
+    const userData = userSnap.data();
+    console.log(userData);
+    return userData;
+  } else {
+    console.log("No data available");
+    return null;
+  }
+};
+
+// Creates a user profile in the database if it doesn't already exist
+export const ensureUserProfile = async (user: FirebaseAuthTypes.User) => {
+  if (!user) return null;
+
+  const db = getFirestore();
+  const userRef = doc(db, "users", user.uid);
+  const userSnap = await getDoc(userRef);
+  if (!userSnap.exists()) {
+    const userData = {
+      profile: {
+        name: user.displayName || "",
+        email: user.email || "",
+        phone: user.phoneNumber || "",
+      },
+      vehicleIds: [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    await setDoc(userRef, userData);
+    console.log("Created new user profile in database");
+    return userData;
+  }
+  return userSnap.data();
+};
+
+// Retry user profile creation - call this when user tries to access profile features
+export const retryUserProfileCreation = async () => {
+  try {
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      console.log("No authenticated user to create profile for");
+      return false;
+    }
+
+    console.log("Retrying user profile creation for:", currentUser.uid);
+    await ensureUserProfile(currentUser);
+    console.log("User profile creation retry successful");
+    return true;
+  } catch (error: any) {
+    console.warn("User profile creation retry failed:", error.code);
+    return false;
+  }
 };
 
 // Authentication functions
@@ -180,18 +219,20 @@ export const signIn = async (email: string, password: string) => {
 
     // Use React Native Firebase auth
     const auth = getAuth();
+    console.log("Attempting authentication...");
     const userCredential = await signInWithEmailAndPassword(
       auth,
       email,
       password
     );
+    console.log("Authentication successful, user ID:", userCredential.user.uid);
 
-    // Add this line to ensure user exists in database
-    await ensureUserProfile(userCredential.user);
+    // Return successful login immediately - don't wait for Firestore operations
+    // Firestore operations will happen in background (non-blocking)
+    setTimeout(async () => {}, 100); // Very short delay to not block login UI
 
     return { user: userCredential.user, error: null };
   } catch (error: any) {
-    // Provide more specific error messages based on Firebase error codes
     console.error("Firebase authentication error:", error.code, error.message);
 
     let errorMessage = "Failed to sign in";
@@ -203,6 +244,8 @@ export const signIn = async (email: string, password: string) => {
       errorMessage = "Invalid email format";
     } else if (error.code === "auth/too-many-requests") {
       errorMessage = "Too many failed login attempts. Please try again later";
+    } else if (error.code === "firestore/unavailable") {
+      errorMessage = "Database temporarily unavailable. Please try again.";
     }
 
     return {
@@ -225,11 +268,26 @@ export const signUp = async (email: string, password: string) => {
       password
     );
 
-    // Add this line to create user profile in database
-    await ensureUserProfile(userCredential.user);
+    console.log("Signup successful, user ID:", userCredential.user.uid);
+
+    // Create user profile in background (non-blocking)
+    setTimeout(async () => {
+      try {
+        console.log("Background: Creating user profile...");
+        await ensureUserProfile(userCredential.user);
+        console.log("Background: User profile created successfully");
+      } catch (firestoreError: any) {
+        console.warn(
+          "Background: Could not create user profile:",
+          firestoreError.code
+        );
+        // This will be retried later when user accesses profile-related features
+      }
+    }, 100);
 
     return { user: userCredential.user, error: null };
   } catch (error) {
+    console.error("Firebase signup error:", error);
     return { user: null, error };
   }
 };
@@ -252,57 +310,131 @@ export const onAuthChange = (
 };
 
 export const getUserProfile = async (userId: string) => {
-  const database = getDatabase();
-  const userRef = ref(database, `users/${userId}/profile`);
+  console.log("📋 Getting user profile for:", userId);
+  try {
+    const db = getFirestore();
+    const userRef = doc(db, "users", userId);
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists()) {
+      const userData = userSnap.data();
+      console.log("📋 User profile found:", userData?.profile);
+      return userData?.profile || null;
+    } else {
+      console.log("📋 No user profile found in Firestore");
+      return null;
+    }
+  } catch (error: any) {
+    console.error("📋 getUserProfile error:", {
+      code: error.code,
+      message: error.message,
+      stack: error.stack,
+    });
+    throw error;
+  }
+};
+
+// Debug function to check Firestore data across databases
+export const debugFirestoreData = async (userId: string) => {
+  console.log("🔍 Starting comprehensive Firestore debugging...");
 
   try {
-    const snapshot = await get(userRef);
-    if (snapshot.exists()) {
-      return snapshot.val();
+    // Check auth state
+    const currentUser = getAuth().currentUser;
+    console.log("🔍 Current user:", {
+      uid: currentUser?.uid,
+      email: currentUser?.email,
+      displayName: currentUser?.displayName,
+    });
+
+    // Check different database references
+    const defaultDb = getFirestore();
+
+    console.log("🔍 Testing basic Firestore connectivity...");
+    try {
+      const testRef = defaultDb.collection("test").doc("connectivity");
+      console.log("🔍 Created test reference successfully");
+
+      await testRef.set({
+        timestamp: new Date().toISOString(),
+        test: true,
+        userId: userId,
+      });
+      console.log("🔍 Firestore write test successful");
+
+      const testSnap = await testRef.get();
+      console.log("🔍 Firestore read test successful:", testSnap.data());
+
+      await testRef.delete();
+      console.log("🔍 Firestore delete test successful");
+    } catch (connectivityError: any) {
+      console.error(
+        "🔍 Firestore connectivity test failed:",
+        connectivityError
+      );
+      console.error("🔍 Error code:", connectivityError.code);
+      console.error("🔍 Error message:", connectivityError.message);
     }
-    return null;
+
+    console.log("🔍 Checking users collection in default database...");
+    try {
+      const defaultUserRef = defaultDb.collection("users").doc(userId);
+      const defaultUserSnap = await defaultUserRef.get();
+      console.log("🔍 Default DB user exists:", defaultUserSnap.exists());
+      if (defaultUserSnap.exists()) {
+        console.log("🔍 Default DB user data:", defaultUserSnap.data());
+      }
+    } catch (error) {
+      console.error("🔍 Error checking default DB:", error);
+    }
+
+    console.log("🔍 Checking vehicles collection in default database...");
+    try {
+      const defaultVehiclesRef = defaultDb
+        .collection("vehicles")
+        .where("userId", "==", userId);
+      const defaultVehiclesSnap = await defaultVehiclesRef.get();
+      console.log("🔍 Default DB vehicles count:", defaultVehiclesSnap.size);
+      defaultVehiclesSnap.forEach((doc) => {
+        console.log("🔍 Default DB vehicle:", doc.id, doc.data());
+      });
+    } catch (error) {
+      console.error("🔍 Error checking default DB vehicles:", error);
+    }
   } catch (error) {
-    console.error("Error fetching user profile:", error);
-    throw error;
+    console.error("🔍 Debug function error:", error);
   }
 };
 
 // Vehicle-specific functions
 export const getVehicles = async (userId: string) => {
-  const database = getDatabase();
-  const vehiclesRef = ref(database, `users/${userId}/vehicles`);
+  console.log("running getVehicles for user:", userId);
+  const db = getFirestore();
+  console.log("🚗 Querying vehicles from Firestore...");
+  const q = query(collection(db, "vehicles"), where("ownerId", "==", userId));
+  const vehiclesSnapshot = await getDocs(q);
 
-  try {
-    const snapshot = await get(vehiclesRef);
-    if (snapshot.exists()) {
-      const vehiclesData = snapshot.val();
-      // Convert object to array with id included
-      return Object.keys(vehiclesData).map((key) => ({
-        id: key,
-        ...vehiclesData[key],
-      }));
-    }
-    return [];
-  } catch (error) {
-    console.error("Error fetching vehicles:", error);
-    throw error;
-  }
+  const vehicles: any[] = [];
+  vehiclesSnapshot.forEach((doc: any) => {
+    const data = doc.data();
+    // Optionally filter by ownerId here if needed:
+    // if (data.ownerId === userId) {
+    vehicles.push({ id: doc.id, ...data });
+    // }
+  });
+  return vehicles;
 };
 
 export const addVehicle = async (userId: string, vehicleData: any) => {
-  const database = getDatabase();
-  const vehiclesRef = ref(database, `users/${userId}/vehicles`);
-
-  // Create a new unique key for the vehicle
-  const newVehicleRef = push(vehiclesRef);
-
-  try {
-    await set(newVehicleRef, vehicleData);
-    return { id: newVehicleRef.key };
-  } catch (error) {
-    console.error("Error adding vehicle:", error);
-    throw error;
-  }
+  const db = getFirestore();
+  const vehicleWithOwner = {
+    ...vehicleData,
+    ownerId: userId,
+  };
+  const vehiclesCol = collection(db, "vehicles");
+  const docRef = await addDoc(vehiclesCol, vehicleWithOwner);
+  const userRef = doc(db, "users", userId);
+  await updateDoc(userRef, { vehicleIds: arrayUnion(docRef.id) });
+  return { id: docRef.id };
 };
 
 export const updateVehicle = async (
@@ -310,104 +442,46 @@ export const updateVehicle = async (
   vehicleId: string,
   vehicleData: any
 ) => {
-  const database = getDatabase();
-  const vehicleRef = ref(database, `users/${userId}/vehicles/${vehicleId}`);
-
-  try {
-    await update(vehicleRef, vehicleData);
-    return { id: vehicleId };
-  } catch (error) {
-    console.error("Error updating vehicle:", error);
-    throw error;
-  }
+  const db = getFirestore();
+  const vehicleRef = doc(db, "vehicles", vehicleId);
+  await updateDoc(vehicleRef, vehicleData);
+  return { id: vehicleId };
 };
 
 export const deleteVehicle = async (userId: string, vehicleId: string) => {
-  const database = getDatabase();
-  const vehicleRef = ref(database, `users/${userId}/vehicles/${vehicleId}`);
-
-  try {
-    await remove(vehicleRef);
-    return true;
-  } catch (error) {
-    console.error("Error deleting vehicle:", error);
-    throw error;
-  }
+  const db = getFirestore();
+  const vehicleRef = doc(db, "vehicles", vehicleId);
+  await deleteDoc(vehicleRef);
+  const userRef = doc(db, "users", userId);
+  await updateDoc(userRef, { vehicleIds: arrayRemove(vehicleId) });
+  return true;
 };
 
-// Get diagnostic logs for a specific vehicle
 export const getDiagnosticLogs = async (userId: string, vehicleId: string) => {
-  const database = getDatabase();
-  const logsRef = ref(database, `users/${userId}/diagnostic_logs`);
-
-  try {
-    const snapshot = await get(logsRef);
-    if (snapshot.exists()) {
-      const logsData = snapshot.val();
-      // Filter logs for the specific vehicle and convert to array
-      return Object.keys(logsData)
-        .filter((key) => logsData[key].vehicleId === vehicleId)
-        .map((key) => ({
-          id: key,
-          ...logsData[key],
-        }));
-    }
-    return [];
-  } catch (error) {
-    console.error("Error fetching diagnostic logs:", error);
-    throw error;
-  }
+  const db = getFirestore();
+  const logsCol = collection(db, "diagnostic_logs");
+  const logsQuery = query(
+    logsCol,
+    where("vehicleId", "==", vehicleId),
+    where("userId", "==", userId)
+  );
+  const logsSnapshot = await getDocs(logsQuery);
+  const logs = logsSnapshot.docs.map((doc: any) => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
+  return logs;
 };
 
-// Creates a user profile in the database if it doesn't already exist
-export const ensureUserProfile = async (user: FirebaseAuthTypes.User) => {
-  if (!user) return null;
-
-  const database = getDatabase();
-  const userRef = ref(database, `users/${user.uid}`);
-
-  try {
-    // Check if user profile already exists
-    const snapshot = await get(userRef);
-
-    if (!snapshot.exists()) {
-      // Create new user profile
-      const userData = {
-        profile: {
-          name: user.displayName || "",
-          email: user.email || "",
-          phone: user.phoneNumber || "",
-        },
-        vehicles: {},
-        diagnostic_logs: {},
-        maintenance_records: {},
-      };
-
-      await set(userRef, userData);
-      console.log("Created new user profile in database");
-      return userData;
-    }
-
-    return snapshot.val();
-  } catch (error) {
-    console.error("Error ensuring user profile:", error);
-    throw error;
-  }
-};
-
-// Update user profile in the database
 export const updateUserProfile = async (userId: string, profileData: any) => {
-  const database = getDatabase();
-  const userProfileRef = ref(database, `users/${userId}/profile`);
-
-  try {
-    await update(userProfileRef, profileData);
-    console.log("User profile updated successfully");
-    return true;
-  } catch (error) {
-    console.error("Error updating user profile:", error);
-    throw error;
-  }
+  const db = getFirestore();
+  const userRef = doc(db, "users", userId);
+  await updateDoc(userRef, {
+    profile: profileData,
+    updatedAt: serverTimestamp(),
+  });
+  console.log("User profile updated successfully");
+  return true;
 };
 
 export default {
@@ -430,4 +504,6 @@ export default {
   getVehicleDiagInfo,
   updateVehicleDiagInfo,
   uploadVehicleImage,
+  retryUserProfileCreation,
+  debugFirestoreData,
 };

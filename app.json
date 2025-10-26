@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bryce512.Mychanic",
+      "bundleIdentifier": "app.mychanic.device",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to your OBD-II device.",
