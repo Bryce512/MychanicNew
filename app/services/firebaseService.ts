@@ -26,7 +26,6 @@ import {
   getDoc,
 } from "@react-native-firebase/firestore";
 import type { FirebaseAuthTypes } from "@react-native-firebase/auth";
-import { auth } from "../../firebaseConfig";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -85,9 +84,18 @@ export const uploadVehicleImage = async (
   }
 };
 
+export const getJob = async (jobId: string) => {
+  const db = getFirestore();
+  const jobRef = doc(db, "jobs", jobId);
+  const jobSnap = await getDoc(jobRef);
+  if (jobSnap.exists()) {
+    return { id: jobSnap.id, data: jobSnap.data() };
+  }
+  return null;
+};
+
 // Update diagInfo for a specific vehicle
 export const updateVehicleDiagInfo = async (
-  userId: string,
   vehicleId: string,
   diagData: any
 ) => {
@@ -102,13 +110,13 @@ export const updateVehicleDiagInfo = async (
 };
 
 // Fetch diagInfo for a specific vehicle
-export const getVehicleDiagInfo = async (userId: string, vehicleId: string) => {
+export const getVehicleById = async (vehicleId: string) => {
   const db = getFirestore();
   const vehicleRef = doc(db, "vehicles", vehicleId);
   const vehicleSnap = await getDoc(vehicleRef);
   if (vehicleSnap.exists()) {
     const vehicleData = vehicleSnap.data();
-    return vehicleData?.diagnosticData || null;
+    return vehicleData || null;
   }
   return null;
 };
@@ -219,13 +227,11 @@ export const signIn = async (email: string, password: string) => {
 
     // Use React Native Firebase auth
     const auth = getAuth();
-    console.log("Attempting authentication...");
     const userCredential = await signInWithEmailAndPassword(
       auth,
       email,
       password
     );
-    console.log("Authentication successful, user ID:", userCredential.user.uid);
 
     // Return successful login immediately - don't wait for Firestore operations
     // Firestore operations will happen in background (non-blocking)
@@ -233,8 +239,6 @@ export const signIn = async (email: string, password: string) => {
 
     return { user: userCredential.user, error: null };
   } catch (error: any) {
-    console.error("Firebase authentication error:", error.code, error.message);
-
     let errorMessage = "Failed to sign in";
     if (error.code === "auth/user-not-found") {
       errorMessage = "No account exists with this email";
@@ -310,17 +314,14 @@ export const onAuthChange = (
 };
 
 export const getUserProfile = async (userId: string) => {
-  console.log("📋 Getting user profile for:", userId);
   try {
     const db = getFirestore();
     const userRef = doc(db, "users", userId);
     const userSnap = await getDoc(userRef);
     if (userSnap.exists()) {
       const userData = userSnap.data();
-      console.log("📋 User profile found:", userData?.profile);
       return userData?.profile || null;
     } else {
-      console.log("📋 No user profile found in Firestore");
       return null;
     }
   } catch (error: any) {
@@ -351,20 +352,20 @@ export const debugFirestoreData = async (userId: string) => {
 
     console.log("🔍 Testing basic Firestore connectivity...");
     try {
-      const testRef = defaultDb.collection("test").doc("connectivity");
+      const testRef = doc(db, "test", "connectivity");
       console.log("🔍 Created test reference successfully");
 
-      await testRef.set({
+      await setDoc(testRef, {
         timestamp: new Date().toISOString(),
         test: true,
         userId: userId,
       });
       console.log("🔍 Firestore write test successful");
 
-      const testSnap = await testRef.get();
+      const testSnap = await getDoc(testRef);
       console.log("🔍 Firestore read test successful:", testSnap.data());
 
-      await testRef.delete();
+      await deleteDoc(testRef);
       console.log("🔍 Firestore delete test successful");
     } catch (connectivityError: any) {
       console.error(
@@ -377,8 +378,8 @@ export const debugFirestoreData = async (userId: string) => {
 
     console.log("🔍 Checking users collection in default database...");
     try {
-      const defaultUserRef = defaultDb.collection("users").doc(userId);
-      const defaultUserSnap = await defaultUserRef.get();
+      const defaultUserRef = doc(db, "users", userId);
+      const defaultUserSnap = await getDoc(defaultUserRef);
       console.log("🔍 Default DB user exists:", defaultUserSnap.exists());
       if (defaultUserSnap.exists()) {
         console.log("🔍 Default DB user data:", defaultUserSnap.data());
@@ -389,12 +390,13 @@ export const debugFirestoreData = async (userId: string) => {
 
     console.log("🔍 Checking vehicles collection in default database...");
     try {
-      const defaultVehiclesRef = defaultDb
-        .collection("vehicles")
-        .where("userId", "==", userId);
-      const defaultVehiclesSnap = await defaultVehiclesRef.get();
+      const vehiclesQuery = query(
+        collection(db, "vehicles"),
+        where("ownerId", "==", userId)
+      );
+      const defaultVehiclesSnap = await getDocs(vehiclesQuery);
       console.log("🔍 Default DB vehicles count:", defaultVehiclesSnap.size);
-      defaultVehiclesSnap.forEach((doc) => {
+      defaultVehiclesSnap.forEach((doc: any) => {
         console.log("🔍 Default DB vehicle:", doc.id, doc.data());
       });
     } catch (error) {
@@ -437,11 +439,7 @@ export const addVehicle = async (userId: string, vehicleData: any) => {
   return { id: docRef.id };
 };
 
-export const updateVehicle = async (
-  userId: string,
-  vehicleId: string,
-  vehicleData: any
-) => {
+export const updateVehicle = async (vehicleId: string, vehicleData: any) => {
   const db = getFirestore();
   const vehicleRef = doc(db, "vehicles", vehicleId);
   await updateDoc(vehicleRef, vehicleData);
@@ -484,6 +482,64 @@ export const updateUserProfile = async (userId: string, profileData: any) => {
   return true;
 };
 
+export const getJobsList = async () => {
+  const db = getFirestore();
+  const jobsCol = collection(db, "jobs");
+  const jobsQuery = query(jobsCol, where("status", "==", "available"));
+  const jobsSnapshot = await getDocs(jobsQuery);
+  const jobs = jobsSnapshot.docs.map((doc: any) => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
+  return jobs;
+};
+
+export const claimJob = async (
+  jobId: string,
+  mechanicId: string | undefined
+) => {
+  if (!mechanicId) {
+    throw new Error("Mechanic ID is required to claim a job");
+  }
+
+  const db = getFirestore();
+  const jobRef = doc(db, "jobs", jobId);
+  await updateDoc(jobRef, {
+    status: "claimed",
+    mechanicId: mechanicId,
+    claimedAt: serverTimestamp(),
+  });
+  console.log(`Job ${jobId} claimed by mechanic ${mechanicId}`);
+  return true;
+};
+
+export const getMyJobs = async (mechanicId: string) => {
+  const jobsCol = collection(db, "jobs");
+  const jobsQuery = query(
+    jobsCol,
+    where("mechanicId", "==", mechanicId),
+    where("status", "==", "claimed")
+  );
+  const jobsSnapshot = await getDocs(jobsQuery);
+  const jobs = jobsSnapshot.docs.map((doc: any) => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
+  return jobs;
+};
+
+export const releaseJob = async (jobId: string) => {
+  const db = getFirestore();
+  const jobRef = doc(db, "jobs", jobId);
+  await updateDoc(jobRef, {
+    status: "available",
+    mechanicId: null,
+    claimedAt: null,
+  });
+  console.log(`Job ${jobId} released back to available`);
+  return true;
+};
+
 export default {
   initializeFirebase,
   readData,
@@ -492,6 +548,7 @@ export default {
   signUp,
   signOut,
   getCurrentUser,
+  getJob,
   onAuthChange,
   getVehicles,
   addVehicle,
@@ -501,9 +558,13 @@ export default {
   ensureUserProfile,
   getUserProfile,
   updateUserProfile,
-  getVehicleDiagInfo,
+  getVehicleById,
   updateVehicleDiagInfo,
   uploadVehicleImage,
   retryUserProfileCreation,
   debugFirestoreData,
+  getJobsList,
+  getMyJobs,
+  claimJob,
+  releaseJob,
 };

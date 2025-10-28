@@ -196,7 +196,7 @@ export const BluetoothProvider = ({ children }: { children: ReactNode }) => {
               require("../services/firebaseService").default.getCurrentUser();
             if (user) {
               const diag =
-                await require("../services/firebaseService").default.getVehicleDiagInfo(
+                await require("../services/firebaseService").default.getVehicleById(
                   user.uid,
                   vehicleId
                 );

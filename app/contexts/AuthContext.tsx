@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import type { FirebaseAuthTypes } from "@react-native-firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import firebaseService from "../services/firebaseService";
+import firebaseService, { getUserProfile } from "../services/firebaseService";
+import * as types from "../../types";
 
 type AuthContextType = {
   user: FirebaseAuthTypes.User | null;
+  profile: types.userProfile | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (
@@ -19,6 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [profile, setProfile] = useState<types.userProfile | null>(null);
 
   // Load stored user data when app starts
   useEffect(() => {
@@ -28,6 +31,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const storedUserData = await AsyncStorage.getItem("userData");
         if (storedUserData) {
           setUser(JSON.parse(storedUserData));
+          let profile = await getUserProfile(JSON.parse(storedUserData).uid);
+          setProfile(profile || null);
         }
       } catch (error) {
         console.error("Failed to load authentication state:", error);
@@ -48,6 +53,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.user && !response.error) {
         await AsyncStorage.setItem("userData", JSON.stringify(response.user));
         setUser(response.user);
+        let profile = await getUserProfile(response.user.uid);
+        setProfile(profile || null);
       }
 
       return response;
@@ -88,8 +95,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, profile, isLoading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

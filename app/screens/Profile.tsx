@@ -66,7 +66,10 @@ const Profile = () => {
           const profile = await getUserProfile(user.uid);
           setProfile(profile);
         } catch (error) {
-          console.error("📋 Profile screen (initial): Error fetching profile:", error);
+          console.error(
+            "📋 Profile screen (initial): Error fetching profile:",
+            error
+          );
         } finally {
           setLoading(false);
         }
@@ -254,8 +257,8 @@ const Profile = () => {
                 }}
                 onPress={async () => {
                   if (user) {
-                    console.log('🔍 Running Firestore debug...');
-                    await debugFirestoreData(user.uid);
+                    console.log("🔍 Running Firestore debug...");
+                    // await debugFirestoreData(user.uid);
                   }
                 }}
               >
@@ -274,6 +277,29 @@ const Profile = () => {
         )}
 
         <View style={{ marginTop: "auto", paddingBottom: 20 }}>
+          <TouchableOpacity
+            style={{
+              backgroundColor: colors.primary[500],
+              padding: 12,
+              borderRadius: 8,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 12,
+            }}
+            onPress={() => navigation.navigate("Feedback" as never)}
+          >
+            <Feather
+              name="message-square"
+              size={18}
+              color="white"
+              style={{ marginRight: 8 }}
+            />
+            <Text style={{ color: "white", fontWeight: "bold" }}>
+              Send Feedback
+            </Text>
+          </TouchableOpacity>
+
           <Button title="Log Out" onPress={signOut} color="#d9534f" />
         </View>
       </View>

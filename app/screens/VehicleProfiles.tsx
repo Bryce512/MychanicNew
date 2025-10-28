@@ -80,7 +80,7 @@ export default function VehicleProfilesScreen() {
         lastSync: Date.now(),
       };
       // Update DB
-      await firebaseService.updateVehicleDiagInfo(userId, vehicle.id, newDiag);
+      await firebaseService.updateVehicleDiagInfo(vehicle.id, newDiag);
       // Refresh context from DB
       await refreshDiagnostics();
       Alert.alert("Diagnostics Synced", "Voltage and RPM updated.");
@@ -149,13 +149,11 @@ export default function VehicleProfilesScreen() {
     // Add deviceId and isConnected as dependencies to rerender on Bluetooth changes
   }, [isFocused, bluetoothContext.deviceId, bluetoothContext.isConnected]);
 
-  const handleViewDiagnosticDetails = (
+  const handleViewJobDetails = (
     navigation: NavigationProp<RootStackParamList>
   ) => {
-    navigation.navigate("DiagnosticsDetail", {
-      userId: 101, // Replace with actual user ID
-      carId: 123, // Replace with actual car ID
-      diagnosticCode: "PO420", // Replace with actual diagnostic code
+    navigation.navigate("JobDetails", {
+      jobId: "hPqMoZXd5KTZASxe32FE",
     });
   };
 
@@ -923,9 +921,7 @@ export default function VehicleProfilesScreen() {
                       <View style={styles.diagnosticsButtonContainer}>
                         <Button
                           title="View Full Diagnostic"
-                          onPress={() =>
-                            handleViewDiagnosticDetails(navigation)
-                          }
+                          onPress={() => handleViewJobDetails(navigation)}
                           style={styles.viewDetailsButton}
                           icon={
                             <Feather
