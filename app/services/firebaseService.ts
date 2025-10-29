@@ -471,14 +471,18 @@ export const getDiagnosticLogs = async (userId: string, vehicleId: string) => {
   return logs;
 };
 
-export const updateUserProfile = async (userId: string, profileData: any) => {
+export const updateUserAddress = async (
+  userId: string,
+  addressType: "homeAddress" | "workAddress",
+  address: string
+) => {
   const db = getFirestore();
   const userRef = doc(db, "users", userId);
   await updateDoc(userRef, {
-    profile: profileData,
+    [`profile.${addressType}`]: address,
     updatedAt: serverTimestamp(),
   });
-  console.log("User profile updated successfully");
+  console.log(`User ${addressType} updated successfully`);
   return true;
 };
 
@@ -515,11 +519,7 @@ export const claimJob = async (
 
 export const getMyJobs = async (mechanicId: string) => {
   const jobsCol = collection(db, "jobs");
-  const jobsQuery = query(
-    jobsCol,
-    where("mechanicId", "==", mechanicId),
-    where("status", "==", "claimed")
-  );
+  const jobsQuery = query(jobsCol, where("mechanicId", "==", mechanicId));
   const jobsSnapshot = await getDocs(jobsQuery);
   const jobs = jobsSnapshot.docs.map((doc: any) => ({
     id: doc.id,
@@ -540,6 +540,40 @@ export const releaseJob = async (jobId: string) => {
   return true;
 };
 
+export const createJob = async (jobData: any) => {
+  const db = getFirestore();
+  const jobsCol = collection(db, "jobs");
+  const docRef = await addDoc(jobsCol, {
+    ...jobData,
+    createdAt: serverTimestamp(),
+  });
+  console.log(`Job created with ID: ${docRef.id}`);
+  return { id: docRef.id };
+};
+
+export const updateJobStatus = async (
+  jobId: string,
+  newStatus: "available" | "claimed" | "in_progress" | "completed"
+) => {
+  const db = getFirestore();
+  const jobRef = doc(db, "jobs", jobId);
+
+  const updateData: any = {
+    status: newStatus,
+    updatedAt: serverTimestamp(),
+  };
+
+  // When marking a job as available, clear mechanic assignment
+  if (newStatus === "available") {
+    updateData.mechanicId = null;
+    updateData.claimedAt = null;
+  }
+
+  await updateDoc(jobRef, updateData);
+  console.log(`Job ${jobId} status updated to ${newStatus}`);
+  return true;
+};
+
 export default {
   initializeFirebase,
   readData,
@@ -557,7 +591,7 @@ export default {
   getDiagnosticLogs,
   ensureUserProfile,
   getUserProfile,
-  updateUserProfile,
+  updateUserAddress,
   getVehicleById,
   updateVehicleDiagInfo,
   uploadVehicleImage,
@@ -567,4 +601,6 @@ export default {
   getMyJobs,
   claimJob,
   releaseJob,
+  createJob,
+  updateJobStatus,
 };

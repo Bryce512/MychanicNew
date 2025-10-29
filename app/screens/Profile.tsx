@@ -1,30 +1,21 @@
 import React, { use } from "react";
 
-import {
-  View,
-  Text,
-  Button,
-  StatusBar,
-  TouchableOpacity,
-  Animated,
-} from "react-native";
+import { View, Text, Button, TouchableOpacity, Animated } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import { styles } from "../theme/styles/Profile.styles";
-import { getUserProfile } from "../services/firebaseService";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { colors } from "../theme/colors";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ToggleButton } from "react-native-paper";
 
 const Profile = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, profile, viewMode, toggleViewMode } = useAuth();
   const navigation = useNavigation();
-  const [profile, setProfile] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [toastVisible, setToastVisible] = React.useState(false);
   const [showUpdateSuccess, setShowUpdateSuccess] = React.useState(false);
   const fadeAnim = React.useState(new Animated.Value(0))[0];
-
   const showToast = (message: string) => {
     setToastVisible(true);
 
@@ -59,28 +50,6 @@ const Profile = () => {
     return phone; // Return as-is if not 10 digits
   };
 
-  React.useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (user) {
-        try {
-          const profile = await getUserProfile(user.uid);
-          setProfile(profile);
-        } catch (error) {
-          console.error(
-            "📋 Profile screen (initial): Error fetching profile:",
-            error
-          );
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        setLoading(false);
-      }
-    };
-
-    fetchUserProfile();
-  }, [user]);
-
   // Reload profile data when screen comes into focus (after editing)
   useFocusEffect(
     React.useCallback(() => {
@@ -88,10 +57,6 @@ const Profile = () => {
         if (user) {
           setLoading(true);
           try {
-            const profile = await getUserProfile(user.uid);
-            const previousProfile = profile;
-            setProfile(profile);
-
             // Check if we should show success message (profile was updated)
             if (showUpdateSuccess) {
               showToast("Profile updated successfully!");
@@ -214,6 +179,14 @@ const Profile = () => {
             {profile.zipCode && (
               <Text style={styles.info}>Zip Code: {profile.zipCode}</Text>
             )}
+            <TouchableOpacity>
+              <Text
+                style={{ color: colors.primary[500], textAlign: "center" }}
+                onPress={() => navigation.navigate("Checkout" as never)}
+              >
+                Checkout Screen Test
+              </Text>
+            </TouchableOpacity>
           </>
         ) : (
           <>
@@ -245,35 +218,41 @@ const Profile = () => {
                   Complete Profile
                 </Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={{
-                  backgroundColor: colors.gray[600],
-                  padding: 12,
-                  borderRadius: 8,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-                onPress={async () => {
-                  if (user) {
-                    console.log("🔍 Running Firestore debug...");
-                    // await debugFirestoreData(user.uid);
-                  }
-                }}
-              >
-                <Feather
-                  name="search"
-                  size={18}
-                  color="white"
-                  style={{ marginRight: 8 }}
-                />
-                <Text style={{ color: "white", fontWeight: "bold" }}>
-                  Debug Database
-                </Text>
-              </TouchableOpacity>
             </View>
           </>
+        )}
+
+        {/* View Mode Toggle for Mechanics */}
+        {profile?.role === "mechanic" && (
+          <View style={{ marginTop: 20, marginBottom: 20 }}>
+            <TouchableOpacity
+              style={{
+                backgroundColor:
+                  viewMode === "mechanic"
+                    ? colors.primary[500]
+                    : colors.gray[400],
+                padding: 12,
+                borderRadius: 8,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 12,
+              }}
+              onPress={toggleViewMode}
+            >
+              <Feather
+                name={viewMode === "mechanic" ? "user" : "truck"}
+                size={18}
+                color="white"
+                style={{ marginRight: 8 }}
+              />
+              <Text style={{ color: "white", fontWeight: "bold" }}>
+                {viewMode === "mechanic"
+                  ? "Switch to Customer View"
+                  : "Switch to Mechanic View"}
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         <View style={{ marginTop: "auto", paddingBottom: 20 }}>

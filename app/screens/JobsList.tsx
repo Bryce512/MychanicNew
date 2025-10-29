@@ -153,7 +153,8 @@ export default function JobsListScreen() {
       }
 
       setUserLocation({ latitude, longitude, zipCode });
-      if (zipCode) {
+      // Only set zip code input if it's currently empty (don't override user input)
+      if (zipCode && !zipCodeInput.trim()) {
         setZipCodeInput(zipCode);
       }
     } catch (error) {
@@ -220,13 +221,26 @@ export default function JobsListScreen() {
       return jobs; // Return all jobs if no location entered
     }
 
+    // Determine if we should use zip code filtering (user entered different zip) or GPS filtering
+    const useZipCodeFiltering =
+      zipCodeInput.trim() &&
+      userLocation?.zipCode &&
+      zipCodeInput.trim() !== userLocation.zipCode;
+
     const filtered: Job[] = [];
 
     for (const job of jobs) {
       let distance: number;
 
-      // Priority: GPS coordinates > geocoded address > zip code distance
-      if (userLocation && job.customerLatitude && job.customerLongitude) {
+      // If user entered a different zip code, prioritize zip code distance
+      if (useZipCodeFiltering && job.customerZipCode) {
+        distance = calculateZipCodeDistance(
+          zipCodeInput.trim(),
+          job.customerZipCode
+        );
+      }
+      // Otherwise, use GPS coordinates if available
+      else if (userLocation && job.customerLatitude && job.customerLongitude) {
         // Use GPS distance calculation
         distance = calculateGPSDistance(
           userLocation.latitude,
@@ -345,7 +359,18 @@ export default function JobsListScreen() {
   };
 
   const calculateJobDistance = async (job: Job): Promise<number | null> => {
-    if (userLocation && job.customerLatitude && job.customerLongitude) {
+    // Determine if we should use zip code filtering (user entered different zip) or GPS filtering
+    const useZipCodeFiltering =
+      zipCodeInput.trim() &&
+      userLocation?.zipCode &&
+      zipCodeInput.trim() !== userLocation.zipCode;
+
+    // If user entered a different zip code, use zip code distance
+    if (useZipCodeFiltering && job.customerZipCode) {
+      return calculateZipCodeDistance(zipCodeInput.trim(), job.customerZipCode);
+    }
+    // Otherwise, use GPS coordinates if available
+    else if (userLocation && job.customerLatitude && job.customerLongitude) {
       // Use GPS distance calculation
       return calculateGPSDistance(
         userLocation.latitude,
@@ -380,6 +405,51 @@ export default function JobsListScreen() {
     // Navigate to job details or claim job
     firebaseService.claimJob(job.id, auth.currentUser?.uid);
     alert("Job claimed successfully!");
+  };
+
+  const getStatusColor = (status: Job["status"]) => {
+    switch (status) {
+      case "available":
+        return colors.primary[500];
+      case "claimed":
+        return colors.accent[500];
+      case "in_progress":
+        return colors.yellow[500];
+      case "completed":
+        return colors.green[500];
+      default:
+        return colors.gray[500];
+    }
+  };
+
+  const getStatusText = (status: Job["status"]) => {
+    switch (status) {
+      case "available":
+        return "Available";
+      case "claimed":
+        return "Claimed";
+      case "in_progress":
+        return "In Progress";
+      case "completed":
+        return "Completed";
+      default:
+        return "Unknown";
+    }
+  };
+
+  const getNextStatusOptions = (
+    currentStatus: Job["status"]
+  ): Job["status"][] => {
+    switch (currentStatus) {
+      case "claimed":
+        return ["in_progress", "completed"];
+      case "in_progress":
+        return ["completed"];
+      case "completed":
+        return []; // No further status changes allowed
+      default:
+        return [];
+    }
   };
 
   const renderJobCard = (job: Job) => {
@@ -425,12 +495,12 @@ export default function JobsListScreen() {
               )}
               <View
                 style={[
-                  styles.priorityBadge,
-                  { backgroundColor: getPriorityColor(job.priority) },
+                  styles.statusBadge,
+                  { backgroundColor: getStatusColor(job.status) },
                 ]}
               >
-                <Text style={styles.priorityText}>
-                  {getPriorityText(job.priority)}
+                <Text style={styles.statusText}>
+                  {getStatusText(job.status)}
                 </Text>
               </View>
             </View>
@@ -521,26 +591,32 @@ export default function JobsListScreen() {
                   </View>
                 )}
 
-                {job.dtcCodes && job.dtcCodes.length > 0 && (
-                  <View style={styles.detailRow}>
-                    <Feather
-                      name="alert-triangle"
-                      size={16}
-                      color={isDark ? colors.gray[400] : colors.gray[500]}
-                    />
-                    <Text
-                      style={[
-                        styles.detailText,
-                        { color: isDark ? colors.white : colors.gray[900] },
-                      ]}
-                    >
-                      DTC: {job.dtcCodes.join(", ")}
-                    </Text>
-                  </View>
-                )}
+                {job.dtcCodes &&
+                  Array.isArray(job.dtcCodes) &&
+                  job.dtcCodes.length > 0 && (
+                    <View style={styles.detailRow}>
+                      <Feather
+                        name="alert-triangle"
+                        size={16}
+                        color={isDark ? colors.gray[400] : colors.gray[500]}
+                      />
+                      <Text
+                        style={[
+                          styles.detailText,
+                          { color: isDark ? colors.white : colors.gray[900] },
+                        ]}
+                      >
+                        DTC: {job.dtcCodes.join(", ")}
+                      </Text>
+                    </View>
+                  )}
               </View>
 
-              {!isMyJobs && (
+              {isMyJobs ? (
+                <View style={styles.statusControls}>
+                  {/* Status controls removed - moved to JobDetails screen */}
+                </View>
+              ) : (
                 <TouchableOpacity
                   style={[
                     styles.claimButton,
@@ -562,7 +638,7 @@ export default function JobsListScreen() {
     return (
       <SafeAreaView
         style={[
-          styles.container,
+          styles.loadingContainer,
           { backgroundColor: isDark ? colors.gray[900] : colors.gray[50] },
         ]}
         edges={["bottom", "left", "right"]}
@@ -571,18 +647,15 @@ export default function JobsListScreen() {
           barStyle={isDark ? "light-content" : "dark-content"}
           backgroundColor={isDark ? colors.gray[900] : colors.gray[50]}
         />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary[500]} />
-          <Text
-            style={{
-              color: isDark ? colors.white : colors.gray[900],
-              marginTop: 16,
-              fontSize: 16,
-            }}
-          >
-            Loading {isMyJobs ? "my jobs" : "available jobs"}...
-          </Text>
-        </View>
+        <ActivityIndicator size="large" color={colors.primary[500]} />
+        <Text
+          style={[
+            styles.loadingText,
+            { color: isDark ? colors.white : colors.gray[900] },
+          ]}
+        >
+          Loading jobs...
+        </Text>
       </SafeAreaView>
     );
   }
@@ -830,6 +903,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: "500",
+    marginTop: 16,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -1008,6 +1086,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
   },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: "600",
+  },
   jobDescription: {
     fontSize: 14,
     lineHeight: 20,
@@ -1042,5 +1130,9 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     fontWeight: "600",
+  },
+  statusControls: {
+    flex: 1,
+    gap: 8,
   },
 });

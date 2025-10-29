@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Linking,
+  Alert,
 } from "react-native";
 import {
   useNavigation,
@@ -33,7 +34,10 @@ export default function JobDetailsScreen() {
   const [customerProfile, setCustomerProfile] =
     React.useState<userProfile | null>(null);
   const { jobId } = route.params;
+  const { viewMode } = useAuth();
   const userRole = useAuth().profile?.role;
+  const [showStatusDropdown, setShowStatusDropdown] =
+    React.useState<boolean>(false);
 
   React.useEffect(() => {
     firebaseService.getJob(jobId).then((fetchedJob) => {
@@ -50,7 +54,7 @@ export default function JobDetailsScreen() {
     }
     if (job?.vehicleId) {
       firebaseService.getVehicleById(job.vehicleId).then((vehicle) => {
-        setCar(vehicle);
+        setCar(vehicle as vehicle | null);
       });
     }
   }, [job?.ownerId, job?.vehicleId]); // Runs when job.ownerId or job.vehicleId changes
@@ -60,10 +64,100 @@ export default function JobDetailsScreen() {
     alert("Job claimed successfully!");
   };
 
-  const handleReleaseJob = () => {
-    firebaseService.releaseJob(jobId);
-    alert("Job released successfully!");
-  }
+  const handleReleaseJob = async () => {
+    try {
+      await firebaseService.releaseJob(jobId);
+      // Update local job state
+      setJob((prevJob) =>
+        prevJob
+          ? { ...prevJob, status: "available", mechanicId: undefined }
+          : null
+      );
+      Alert.alert("Success", "Job released successfully");
+    } catch (error) {
+      console.error("Error releasing job:", error);
+      Alert.alert("Error", "Failed to release job. Please try again.");
+    }
+  };
+
+  const handleUpdateJobStatus = async (newStatus: Job["status"]) => {
+    try {
+      const currentUser = firebaseService.getCurrentUser();
+      if (!currentUser) {
+        Alert.alert("Error", "User not authenticated");
+        return;
+      }
+
+      if (newStatus === "claimed") {
+        await firebaseService.claimJob(jobId, currentUser.uid);
+        // Update local job state
+        setJob((prevJob) =>
+          prevJob
+            ? { ...prevJob, status: newStatus, mechanicId: currentUser.uid }
+            : null
+        );
+        Alert.alert("Success", "Job claimed successfully");
+      } else {
+        await firebaseService.updateJobStatus(jobId, newStatus);
+        // Update local job state
+        setJob((prevJob) =>
+          prevJob ? { ...prevJob, status: newStatus } : null
+        );
+      }
+
+      setShowStatusDropdown(false);
+    } catch (error) {
+      console.error("Error updating job status:", error);
+      Alert.alert("Error", "Failed to update job status. Please try again.");
+    }
+  };
+
+  const getStatusColor = (status: Job["status"]) => {
+    switch (status) {
+      case "available":
+        return colors.primary[500];
+      case "claimed":
+        return colors.accent[500];
+      case "in_progress":
+        return colors.yellow[500];
+      case "completed":
+        return colors.green[500];
+      default:
+        return colors.gray[500];
+    }
+  };
+
+  const getStatusText = (status: Job["status"]) => {
+    switch (status) {
+      case "available":
+        return "Available";
+      case "claimed":
+        return "Claimed";
+      case "in_progress":
+        return "In Progress";
+      case "completed":
+        return "Completed";
+      default:
+        return "Unknown";
+    }
+  };
+
+  const getNextStatusOptions = (
+    currentStatus: Job["status"]
+  ): Job["status"][] => {
+    switch (currentStatus) {
+      case "available":
+        return ["claimed"];
+      case "claimed":
+        return ["available", "in_progress", "completed"];
+      case "in_progress":
+        return ["completed"];
+      case "completed":
+        return ["available", "in_progress"];
+      default:
+        return [];
+    }
+  };
 
   const handleCall = () => {
     Linking.openURL(`tel:${customerProfile?.phone}`);
@@ -82,7 +176,7 @@ export default function JobDetailsScreen() {
       contentContainerStyle={styles.contentContainer}
     >
       {/* User Information Card */}
-      {userRole === "mechanic" && (
+      {viewMode === "mechanic" && (
         <Card>
           <CardHeader>
             <Text
@@ -145,7 +239,7 @@ export default function JobDetailsScreen() {
                   { color: isDark ? colors.white : colors.gray[900] },
                 ]}
               >
-                {customerProfile?.location}
+                {job?.customerLocation}
               </Text>
             </View>
           </CardContent>
@@ -153,7 +247,7 @@ export default function JobDetailsScreen() {
       )}
 
       {/* Vehicle Information Card */}
-      {userRole === "mechanic" && (
+      {viewMode === "mechanic" && (
         <Card>
           <CardHeader>
             <Text
@@ -225,11 +319,11 @@ export default function JobDetailsScreen() {
           <View style={styles.diagnosticHeader}>
             <Text
               style={[
-                styles.cardTitle,
+                styles.diagnosticTitle,
                 { color: isDark ? colors.white : colors.gray[900] },
               ]}
             >
-              Diagnostic Code: {job?.dtcCodes?.join(", ")}
+              {job?.title}
             </Text>
             <View
               style={[
@@ -247,17 +341,23 @@ export default function JobDetailsScreen() {
               <Text style={styles.severityText}>{job?.priority}</Text>
             </View>
           </View>
+
+          {job?.dtcCodes &&
+            Array.isArray(job.dtcCodes) &&
+            job.dtcCodes.length > 0 && (
+              <View style={styles.diagnosticHeader}>
+                <Text
+                  style={[
+                    styles.cardTitle,
+                    { color: isDark ? colors.white : colors.gray[900] },
+                  ]}
+                >
+                  Diagnostic Code: {job.dtcCodes.join(", ")}
+                </Text>
+              </View>
+            )}
         </CardHeader>
         <CardContent>
-          <Text
-            style={[
-              styles.diagnosticTitle,
-              { color: isDark ? colors.white : colors.gray[900] },
-            ]}
-          >
-            {job?.title}
-          </Text>
-
           <Text
             style={[
               styles.diagnosticDescription,
@@ -275,17 +375,6 @@ export default function JobDetailsScreen() {
           alignItems: "center",
         }}
       >
-        {(userRole === "mechanic" || userRole === "admin") && (
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              { backgroundColor: job?.status === "available" ? colors.primary[500] : colors.primary[300] },
-            ]}
-            onPress= {job?.status === "available" ? handleClaimJob : handleReleaseJob}
-          >
-            <Text style={styles.actionButtonText}> {job?.status === "available" ? "Claim Job" : "Release Job"}</Text>
-          </TouchableOpacity>
-        )}
         {(userRole === "user" || userRole === "admin") && (
           <TouchableOpacity
             style={[
@@ -309,6 +398,89 @@ export default function JobDetailsScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Status Update Section for Mechanics */}
+      {viewMode === "mechanic" && job && (
+        <View style={styles.statusControlsContainer}>
+          {job.status !== "available" && (
+            <View style={styles.statusButtonContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.statusButton,
+                  { backgroundColor: getStatusColor(job.status) },
+                ]}
+                onPress={() => setShowStatusDropdown(!showStatusDropdown)}
+              >
+                <Text style={styles.statusButtonText}>
+                  {getStatusText(job.status)}
+                </Text>
+                <Feather
+                  name={showStatusDropdown ? "chevron-up" : "chevron-down"}
+                  size={16}
+                  color={colors.white}
+                  style={styles.statusButtonIcon}
+                />
+              </TouchableOpacity>
+
+              {showStatusDropdown && (
+                <View
+                  style={[
+                    styles.statusDropdown,
+                    {
+                      backgroundColor: isDark ? colors.gray[800] : colors.white,
+                      borderColor: isDark ? colors.gray[600] : colors.gray[300],
+                    },
+                  ]}
+                >
+                  {getNextStatusOptions(job.status).map((statusOption) => (
+                    <TouchableOpacity
+                      key={statusOption}
+                      style={[
+                        styles.statusOption,
+                        {
+                          borderBottomColor: isDark
+                            ? colors.gray[700]
+                            : colors.gray[200],
+                        },
+                      ]}
+                      onPress={() => handleUpdateJobStatus(statusOption)}
+                    >
+                      <Text
+                        style={[
+                          styles.statusOptionText,
+                          { color: isDark ? colors.white : colors.gray[900] },
+                        ]}
+                      >
+                        {statusOption === "claimed"
+                          ? "Claim Job"
+                          : `${getStatusText(statusOption)}`}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[
+              styles.releaseButton,
+              {
+                backgroundColor: colors.primary[500],
+              },
+            ]}
+            onPress={
+              job.status === "available"
+                ? () => handleUpdateJobStatus("claimed")
+                : handleReleaseJob
+            }
+          >
+            <Text style={styles.releaseButtonText}>
+              {job.status === "available" ? "Claim Job" : "Release Job"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -419,6 +591,84 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   actionButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  currentStatusContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  currentStatusLabel: {
+    fontSize: 14,
+    marginRight: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  statusBadgeText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  statusButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  statusButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  statusButtonIcon: {
+    marginLeft: 4,
+  },
+  statusDropdown: {
+    marginTop: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  statusOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  statusOptionText: {
+    fontSize: 14,
+  },
+  statusControlsContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 24,
+  },
+  statusButtonContainer: {
+    position: "relative",
+  },
+  releaseButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  releaseButtonText: {
     color: colors.white,
     fontSize: 16,
     fontWeight: "600",

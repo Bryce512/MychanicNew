@@ -3,6 +3,7 @@ import React from "react";
 import { StatusBar } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useNavigation } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../components/theme-provider";
@@ -74,6 +75,8 @@ import MechanicDashboardScreen from "../screens/MechanicDashboard";
 import LiveDataScreen from "../screens/LiveData";
 import JobsListScreen from "../screens/JobsList";
 import FeedbackScreen from "../screens/Feedback";
+import RequestJobScreen from "../screens/RequestJob";
+import CheckoutScreen from "../screens/Checkout";
 
 export type RootStackParamList = {
   Main: undefined;
@@ -94,6 +97,13 @@ export type RootStackParamList = {
   LiveData: undefined;
   JobsList: { isMyJobs?: boolean };
   Feedback: undefined;
+  RequestJob: undefined;
+  Checkout: {
+    jobId?: string;
+    amount: number;
+    description: string;
+    mechanicName?: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -152,7 +162,7 @@ function MainTabs() {
         name="Home"
         component={HomeScreen}
         options={{
-          title: "Mychanic",
+          title: "Home",
           tabBarIcon: ({ color, size }) => (
             <Feather name="home" size={size} color={color} />
           ),
@@ -195,8 +205,22 @@ function MainTabs() {
 import { View, ActivityIndicator } from "react-native";
 
 export default function AppNavigator() {
-  const { user, isLoading, profile } = useAuth();
+  const { user, isLoading, profile, viewMode } = useAuth();
   const { colors } = useTheme();
+  const navigation = useNavigation();
+
+  // Navigate to appropriate screen when viewMode changes
+  React.useEffect(() => {
+    if (user && !isLoading) {
+      if (viewMode === "user") {
+        // Navigate to Main tabs for user view
+        navigation.navigate("Main" as never);
+      } else if (viewMode === "mechanic" && profile?.role === "mechanic") {
+        // Navigate to MechanicDashboard for mechanic view
+        navigation.navigate("MechanicDashboard" as never);
+      }
+    }
+  }, [viewMode, user, isLoading, profile?.role, navigation]);
 
   // Set global status bar for blue headers
   React.useEffect(() => {
@@ -237,8 +261,17 @@ export default function AppNavigator() {
     >
       {user ? (
         <>
-          {/* Mechanic-only screens */}
-          {hasRole(profile?.role, ["mechanic", "admin"]) && (
+          {/* Main tabs for regular users - show when in user view */}
+          {viewMode === "user" && (
+            <Stack.Screen
+              name="Main"
+              component={MainTabs}
+              options={{ headerShown: false }}
+            />
+          )}
+
+          {/* Mechanic-only screens - show when in mechanic view */}
+          {viewMode === "mechanic" && (
             <Stack.Screen
               name="MechanicDashboard"
               component={MechanicDashboardScreen}
@@ -246,7 +279,7 @@ export default function AppNavigator() {
             />
           )}
 
-          {hasRole(profile?.role, ["mechanic", "admin", "user"]) && (
+          {viewMode === "mechanic" && (
             <Stack.Screen
               name="JobsList"
               component={JobsListScreen}
@@ -254,13 +287,12 @@ export default function AppNavigator() {
             />
           )}
 
-          {hasRole(profile?.role, ["mechanic", "admin"]) && (
-            <Stack.Screen
-              name="Profile"
-              component={ProfileScreen}
-              options={{ title: "Profile" }}
-            />
-          )}
+          {/* Profile screen - available to all authenticated users */}
+          <Stack.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{ title: "Profile" }}
+          />
 
           {/* All authenticated users screens */}
           <Stack.Screen
@@ -268,11 +300,13 @@ export default function AppNavigator() {
             component={VehicleProfilesScreen}
             options={{ title: "My Vehicles" }}
           />
-          <Stack.Screen
-            name="Main"
-            component={MainTabs}
-            options={{ headerShown: false }}
-          />
+          {viewMode === "mechanic" && (
+            <Stack.Screen
+              name="Main"
+              component={MainTabs}
+              options={{ headerShown: false }}
+            />
+          )}
           <Stack.Screen
             name="BookAppointment"
             component={BookAppointmentScreen}
@@ -323,6 +357,16 @@ export default function AppNavigator() {
             name="Feedback"
             component={FeedbackScreen}
             options={{ title: "Send Feedback" }}
+          />
+          <Stack.Screen
+            name="RequestJob"
+            component={RequestJobScreen}
+            options={{ title: "Request Job" }}
+          />
+          <Stack.Screen
+            name="Checkout"
+            component={CheckoutScreen}
+            options={{ title: "Checkout" }}
           />
         </>
       ) : (

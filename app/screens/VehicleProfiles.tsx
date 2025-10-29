@@ -672,7 +672,9 @@ export default function VehicleProfilesScreen() {
 
                         <Button
                           title="Schedule Service"
-                          onPress={() => {}}
+                          onPress={() => navigation.navigate("RequestJob", {
+                            vehicleId: vehicles[selectedVehicle].id,
+                          })}
                           variant="outline"
                           icon={
                             <Feather

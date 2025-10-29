@@ -8,8 +8,10 @@ export type userProfile = {
   state: string | null;
   zipCode: string | null;
   address: string | null;
+  homeAddress?: string | null;
+  workAddress?: string | null;
   cars: number[] | null;
-  role: "user" | "mechanic" | "admin"| null;
+  role: "user" | "mechanic" | "admin" | null;
 };
 
 export type vehicle = {
@@ -45,7 +47,7 @@ export type DiagnosticData = {
   diagnostic: Diagnostic | null;
 };
 
-export type  Job = {
+export type Job = {
   id: string;
   title: string;
   description: string;
@@ -70,4 +72,4 @@ export type  Job = {
   createdAt: any;
   symptoms?: string[];
   dtcCodes?: string[];
-}
+};
