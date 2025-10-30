@@ -1177,7 +1177,8 @@ export const useBleConnection = (options?: {
   const sendCommand = async (
     device: Device,
     command: string,
-    retries = 2 // Default to 2 retries
+    retries = 2, // Default to 2 retries
+    customTimeoutMs?: number // Optional custom timeout
   ): Promise<string> => {
     if (!device) {
       console.error("No device connected");
@@ -1305,7 +1306,8 @@ export const useBleConnection = (options?: {
           }
 
           // Add a timeout - shorter for retry attempts
-          const timeoutMs = attempt === retries ? 5000 : 3000;
+          const timeoutMs =
+            customTimeoutMs || (attempt === retries ? 5000 : 3000);
           setTimeout(() => {
             if (!isCompleted) {
               isCompleted = true;

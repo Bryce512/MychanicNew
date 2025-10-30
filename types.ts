@@ -16,7 +16,7 @@ export type userProfile = {
 
 export type vehicle = {
   id: string;
-  name: string;
+  nickname: string;
   image: string;
   lastSync: string;
   obd: string;
@@ -31,6 +31,7 @@ export type vehicle = {
   year: number;
   color: string;
   vin: string;
+  ownerId: string[]; // Array to allow multiple owners
 };
 
 export type Diagnostic = {

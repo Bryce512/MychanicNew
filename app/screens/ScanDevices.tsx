@@ -25,7 +25,7 @@ import {
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useNavigation, useTheme } from "@react-navigation/native";
-import { pidCommands } from "../services/pidCommands";
+import { obdDataFunctions } from "../services/obdService";
 import BluetoothDeviceSelector from "../components/BluetoothDeviceSelector";
 import { useBluetooth } from "../contexts/BluetoothContext";
 import firebaseService from "../services/firebaseService";
@@ -115,7 +115,7 @@ const ScanDevicesScreen = () => {
   );
   // Local state for device selector modal
   const [showDeviceSelector, setShowDeviceSelector] = useState(false);
-  const { getCurrentVoltage, getEngineRPM } = pidCommands();
+  // const { getCurrentVoltage, getEngineRPM } = pidCommands();
   const [rpm, setRpm] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
@@ -185,7 +185,7 @@ const ScanDevicesScreen = () => {
                 fontWeight: "600",
               }}
             >
-              {vehicle.name || "Vehicle"}
+              {vehicle.nickname || "Vehicle"}
             </Text>
           </TouchableOpacity>
         ))}

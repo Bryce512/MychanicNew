@@ -4,12 +4,10 @@ import { useState, useEffect } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   Image,
   TouchableOpacity,
   useColorScheme,
-  StatusBar,
 } from "react-native";
 import { useBluetooth } from "../contexts/BluetoothContext";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -29,7 +27,7 @@ const DEFAULT_IMAGE =
   "https://firebasestorage.googleapis.com/v0/b/fluid-tangent-405719.firebasestorage.app/o/public%2Fcar_default.png?alt=media&token=5232adad-a5f7-4b8c-be47-781163a7eaa1";
 import firebaseService from "../services/firebaseService";
 import { useDiagnostics } from "../contexts/VehicleDiagnosticsContext";
-import { pidCommands } from "../services/pidCommands";
+import { obdDataFunctions } from "../services/obdService";
 import { Alert } from "react-native";
 
 export default function VehicleProfilesScreen() {
@@ -42,70 +40,9 @@ export default function VehicleProfilesScreen() {
   const [selectedVehicle, setSelectedVehicle] = useState(0);
   const [loading, setLoading] = useState(true);
   const bluetoothContext = useBluetooth();
-  const { getCurrentVoltage, getEngineRPM } = pidCommands();
+  // const { getCurrentVoltage, getEngineRPM } = pidCommands();
   const isFocused = useIsFocused();
   const styles = vehicleProfileStyles;
-
-  // Helper to sync diagnostics data (voltage, rpm) for selected vehicle
-  const syncVehicleDiagnostics = async () => {
-    const { deviceId, isConnected, plxDevice } = bluetoothContext;
-    const { diagnostics, refreshDiagnostics } = diagnosticsContext;
-    const vehicle = vehicles[selectedVehicle];
-    if (!isConnected || !plxDevice || !vehicle) {
-      Alert.alert(
-        "No OBD-II Device Connected",
-        "Please connect to an OBD-II device first."
-      );
-      return;
-    }
-    try {
-      const voltage = await getCurrentVoltage(plxDevice);
-      const rpm = await getEngineRPM(plxDevice);
-      // Parse voltage: extract first valid number (e.g., 12.4) from response string
-      let parsedVoltage = 0;
-      if (typeof voltage === "string") {
-        const match = voltage.match(/(\d+\.?\d*)/);
-        if (match) parsedVoltage = parseFloat(match[1]);
-      } else if (typeof voltage === "number") {
-        parsedVoltage = voltage;
-      }
-      // Update diagnostics context locally (refreshDiagnostics will reload from DB, so we update DB first)
-      const userId = firebaseService.getCurrentUser()?.uid;
-      if (!userId) throw new Error("No user ID");
-      // Prepare new diagnostics data
-      const newDiag = {
-        ...diagnostics[vehicle.id],
-        battV: parsedVoltage,
-        rpm: typeof rpm === "number" && !isNaN(rpm) ? rpm : 0,
-        lastSync: Date.now(),
-      };
-      // Update DB
-      await firebaseService.updateVehicleDiagInfo(vehicle.id, newDiag);
-      // Refresh context from DB
-      await refreshDiagnostics();
-      Alert.alert("Diagnostics Synced", "Voltage and RPM updated.");
-    } catch (err) {
-      const errorMessage =
-        err && typeof err === "object" && "message" in err
-          ? (err as Error).message
-          : "Could not sync diagnostics.";
-      Alert.alert("Sync Failed", errorMessage);
-    }
-  };
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <Feather
-          name="user"
-          size={24}
-          style={{ marginRight: 16, color: colors.white }}
-          onPress={() => navigation.navigate("Profile")}
-        />
-      ),
-      headerShown: true,
-      title: "My Vehicles",
-    });
-  }, [navigation]);
 
   // Fetch vehicles on focus or when Bluetooth connection status/device changes
   useEffect(() => {
@@ -114,7 +51,6 @@ export default function VehicleProfilesScreen() {
         setLoading(true);
         const currentUser = firebaseService.getCurrentUser();
         if (currentUser) {
-          // await firebaseService.ensureUserProfile(currentUser);
           const userVehicles = await firebaseService.getVehicles(
             currentUser.uid
           );
@@ -183,7 +119,7 @@ export default function VehicleProfilesScreen() {
   })();
 
   return (
-    <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
+    <SafeAreaView style={styles.container} edges={["left", "right"]}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           {/* Vehicle List */}
@@ -213,7 +149,7 @@ export default function VehicleProfilesScreen() {
                     <Text
                       style={[styles.vehicleName, isDark && styles.textLight]}
                     >
-                      {vehicle.name}
+                      {vehicle.nickname || vehicle.model}
                     </Text>
 
                     <View
@@ -226,23 +162,17 @@ export default function VehicleProfilesScreen() {
                       ]}
                     >
                       {vehicleIsConnected ? (
-                        <View style={styles.badgeContent}>
-                          <Feather
-                            name="check-circle"
-                            size={12}
-                            color={colors.green[500]}
-                          />
-                          <Text style={styles.connectedText}>Connected</Text>
-                        </View>
+                        <Feather
+                          name="bluetooth"
+                          size={14}
+                          color={colors.green[500]}
+                        />
                       ) : (
-                        <Text
-                          style={[
-                            styles.notConnectedText,
-                            isDark && styles.textMutedLight,
-                          ]}
-                        >
-                          Not Connected
-                        </Text>
+                        <Feather
+                          name="bluetooth"
+                          size={14}
+                          color={isDark ? colors.gray[500] : colors.gray[400]}
+                        />
                       )}
                     </View>
                   </View>
@@ -266,19 +196,139 @@ export default function VehicleProfilesScreen() {
                       <Text
                         style={[
                           styles.statusValue,
-                          vehicle.status === "Good"
-                            ? styles.statusGood
-                            : vehicle.status === "Fair"
-                            ? styles.statusFair
-                            : vehicle.status === "Poor"
-                            ? styles.statusPoor
-                            : styles.statusUnknown,
+                          (() => {
+                            // Calculate health status based on service averages
+                            const diag =
+                              diagnosticsContext.diagnostics[vehicle.id];
+                            if (!diag) return styles.statusUnknown;
+
+                            const oilRemaining =
+                              diag.milesSinceLastOilChange &&
+                              diag.milesBetweenOilChanges
+                                ? Math.max(
+                                    0,
+                                    100 -
+                                      Math.round(
+                                        (diag.milesSinceLastOilChange /
+                                          diag.milesBetweenOilChanges) *
+                                          100
+                                      )
+                                  )
+                                : 0;
+
+                            const brakeRemaining =
+                              diag.milesSinceLastBrakeService &&
+                              diag.milesBetweenBrakeChanges
+                                ? Math.max(
+                                    0,
+                                    100 -
+                                      Math.round(
+                                        (diag.milesSinceLastBrakeService /
+                                          diag.milesBetweenBrakeChanges) *
+                                          100
+                                      )
+                                  )
+                                : 0;
+
+                            const tireRemaining =
+                              diag.milesSinceLastTireService &&
+                              diag.milesBetweenTireService
+                                ? Math.max(
+                                    0,
+                                    100 -
+                                      Math.round(
+                                        (diag.milesSinceLastTireService /
+                                          diag.milesBetweenTireService) *
+                                          100
+                                      )
+                                  )
+                                : 0;
+
+                            const services = [
+                              oilRemaining,
+                              brakeRemaining,
+                              tireRemaining,
+                            ];
+                            const servicesBelow10 = services.filter(
+                              (s) => s <= 10
+                            ).length;
+                            const servicesBelow30 = services.filter(
+                              (s) => s <= 30
+                            ).length;
+
+                            if (servicesBelow10 > 0) return styles.statusPoor; // Red for "Needs Maintenance"
+                            if (servicesBelow30 > 0) return styles.statusFair; // Yellow for "Fair"
+                            return styles.statusGood; // Green for "Good"
+                          })(),
                           isDark &&
                             vehicle.status === "Unknown" &&
                             styles.textMutedLight,
                         ]}
                       >
-                        {vehicle.status}
+                        {(() => {
+                          // Calculate health status text based on service averages
+                          const diag =
+                            diagnosticsContext.diagnostics[vehicle.id];
+                          if (!diag) return "Unknown";
+
+                          const oilRemaining =
+                            diag.milesSinceLastOilChange &&
+                            diag.milesBetweenOilChanges
+                              ? Math.max(
+                                  0,
+                                  100 -
+                                    Math.round(
+                                      (diag.milesSinceLastOilChange /
+                                        diag.milesBetweenOilChanges) *
+                                        100
+                                    )
+                                )
+                              : 0;
+
+                          const brakeRemaining =
+                            diag.milesSinceLastBrakeService &&
+                            diag.milesBetweenBrakeChanges
+                              ? Math.max(
+                                  0,
+                                  100 -
+                                    Math.round(
+                                      (diag.milesSinceLastBrakeService /
+                                        diag.milesBetweenBrakeChanges) *
+                                        100
+                                    )
+                                )
+                              : 0;
+
+                          const tireRemaining =
+                            diag.milesSinceLastTireService &&
+                            diag.milesBetweenTireService
+                              ? Math.max(
+                                  0,
+                                  100 -
+                                    Math.round(
+                                      (diag.milesSinceLastTireService /
+                                        diag.milesBetweenTireService) *
+                                        100
+                                    )
+                                )
+                              : 0;
+
+                          const services = [
+                            oilRemaining,
+                            brakeRemaining,
+                            tireRemaining,
+                          ];
+                          const servicesBelow10 = services.filter(
+                            (s) => s <= 10
+                          ).length;
+                          const servicesBelow30 = services.filter(
+                            (s) => s <= 30
+                          ).length;
+
+                          if (servicesBelow10 > 0) return "Needs Maintenance";
+                          if (servicesBelow30 > 0) return "Fair";
+                          return "Good";
+                        })()}
                       </Text>
                     </View>
 
@@ -286,14 +336,128 @@ export default function VehicleProfilesScreen() {
                       <View
                         style={[
                           styles.progressBar,
-                          { width: `${vehicle.progress}%` },
-                          vehicle.status === "Good"
-                            ? styles.progressGood
-                            : vehicle.status === "Fair"
-                            ? styles.progressFair
-                            : vehicle.status === "Poor"
-                            ? styles.progressPoor
-                            : styles.progressUnknown,
+                          {
+                            width: `${(() => {
+                              // Calculate average health percentage
+                              const diag =
+                                diagnosticsContext.diagnostics[vehicle.id];
+                              if (!diag) return "0";
+
+                              const oilRemaining =
+                                diag.milesSinceLastOilChange &&
+                                diag.milesBetweenOilChanges
+                                  ? Math.max(
+                                      0,
+                                      100 -
+                                        Math.round(
+                                          (diag.milesSinceLastOilChange /
+                                            diag.milesBetweenOilChanges) *
+                                            100
+                                        )
+                                    )
+                                  : 0;
+
+                              const brakeRemaining =
+                                diag.milesSinceLastBrakeService &&
+                                diag.milesBetweenBrakeChanges
+                                  ? Math.max(
+                                      0,
+                                      100 -
+                                        Math.round(
+                                          (diag.milesSinceLastBrakeService /
+                                            diag.milesBetweenBrakeChanges) *
+                                            100
+                                        )
+                                    )
+                                  : 0;
+
+                              const tireRemaining =
+                                diag.milesSinceLastTireService &&
+                                diag.milesBetweenTireService
+                                  ? Math.max(
+                                      0,
+                                      100 -
+                                        Math.round(
+                                          (diag.milesSinceLastTireService /
+                                            diag.milesBetweenTireService) *
+                                            100
+                                        )
+                                    )
+                                  : 0;
+
+                              const averageHealth = Math.round(
+                                (oilRemaining +
+                                  brakeRemaining +
+                                  tireRemaining) /
+                                  3
+                              );
+                              return averageHealth;
+                            })()}%`,
+                          },
+                          (() => {
+                            // Calculate progress bar color
+                            const diag =
+                              diagnosticsContext.diagnostics[vehicle.id];
+                            if (!diag) return styles.progressUnknown;
+
+                            const oilRemaining =
+                              diag.milesSinceLastOilChange &&
+                              diag.milesBetweenOilChanges
+                                ? Math.max(
+                                    0,
+                                    100 -
+                                      Math.round(
+                                        (diag.milesSinceLastOilChange /
+                                          diag.milesBetweenOilChanges) *
+                                          100
+                                      )
+                                  )
+                                : 0;
+
+                            const brakeRemaining =
+                              diag.milesSinceLastBrakeService &&
+                              diag.milesBetweenBrakeChanges
+                                ? Math.max(
+                                    0,
+                                    100 -
+                                      Math.round(
+                                        (diag.milesSinceLastBrakeService /
+                                          diag.milesBetweenBrakeChanges) *
+                                          100
+                                      )
+                                  )
+                                : 0;
+
+                            const tireRemaining =
+                              diag.milesSinceLastTireService &&
+                              diag.milesBetweenTireService
+                                ? Math.max(
+                                    0,
+                                    100 -
+                                      Math.round(
+                                        (diag.milesSinceLastTireService /
+                                          diag.milesBetweenTireService) *
+                                          100
+                                      )
+                                  )
+                                : 0;
+
+                            const services = [
+                              oilRemaining,
+                              brakeRemaining,
+                              tireRemaining,
+                            ];
+                            const servicesBelow10 = services.filter(
+                              (s) => s <= 10
+                            ).length;
+                            const servicesBelow30 = services.filter(
+                              (s) => s <= 30
+                            ).length;
+
+                            if (servicesBelow10 > 0) return styles.progressPoor;
+                            if (servicesBelow30 > 0) return styles.progressFair;
+                            return styles.progressGood;
+                          })(),
                         ]}
                       />
                     </View>
@@ -394,7 +558,8 @@ export default function VehicleProfilesScreen() {
                     <Text
                       style={[styles.detailsTitle, isDark && styles.textLight]}
                     >
-                      {vehicles[selectedVehicle].name}
+                      {vehicles[selectedVehicle].nickname ||
+                        vehicles[selectedVehicle].model}
                     </Text>
                     <Text
                       style={[
@@ -420,51 +585,6 @@ export default function VehicleProfilesScreen() {
                       }
                     }}
                   />
-                </View>
-
-                <View style={styles.detailsActions}>
-                  {(() => {
-                    const { deviceId, isConnected, plxDevice } =
-                      bluetoothContext;
-                    const vehicle = vehicles[selectedVehicle];
-                    const vehicleIsConnected = isConnected; // && deviceId === vehicle.obdUUID;
-                    if (vehicleIsConnected) {
-                      return (
-                        <Button
-                          title="Sync Data"
-                          onPress={syncVehicleDiagnostics}
-                          variant="outline"
-                          size="sm"
-                          icon={
-                            <Feather
-                              name="refresh-cw"
-                              size={14}
-                              color={
-                                isDark ? colors.white : colors.primary[500]
-                              }
-                            />
-                          }
-                        />
-                      );
-                    } else {
-                      return (
-                        <Button
-                          title="Connect OBD-II"
-                          onPress={() =>
-                            navigation.navigate("ScanDevices" as never)
-                          }
-                          size="sm"
-                          icon={
-                            <Feather
-                              name="upload-cloud"
-                              size={14}
-                              color={colors.white}
-                            />
-                          }
-                        />
-                      );
-                    }
-                  })()}
                 </View>
               </CardHeader>
 
@@ -509,6 +629,657 @@ export default function VehicleProfilesScreen() {
                     </View>
                   </View>
                 )}
+                <View>
+                  <Card style={styles.diagnosticsCard}>
+                    <CardHeader style={styles.diagnosticsCardHeader}>
+                      <Text
+                        style={[
+                          styles.diagnosticsTitle,
+                          isDark && styles.textLight,
+                        ]}
+                      >
+                        Diagnostic Summary
+                      </Text>
+                      <Button
+                        title="Live Data"
+                        onPress={() => navigation.navigate("LiveData")}
+                        variant="outline"
+                        size="sm"
+                        style={styles.viewDetailsButton}
+                        icon={
+                          <Feather
+                            name="activity"
+                            size={12}
+                            color={isDark ? colors.white : colors.primary[500]}
+                          />
+                        }
+                      />
+                    </CardHeader>
+                    <CardContent>
+                      <View style={styles.diagnosticsGrid}>
+                        {vehicles[selectedVehicle] &&
+                        diagnosticsContext.diagnostics[
+                          vehicles[selectedVehicle].id
+                        ] ? (
+                          <>
+                            {/* Oil Life */}
+                            <View style={styles.progressHeader}>
+                              <Feather
+                                name="droplet"
+                                size={16}
+                                color={(() => {
+                                  const vehicle = vehicles[selectedVehicle];
+
+                                  // Check if there's no service history data
+                                  const hasOilData =
+                                    vehicle.lastOilChange &&
+                                    vehicle.milesAtLastOilChange !== undefined;
+
+                                  if (!hasOilData) {
+                                    return colors.gray[500];
+                                  }
+
+                                  const milesSince =
+                                    diagnosticsContext.diagnostics[
+                                      vehicles[selectedVehicle].id
+                                    ].milesSinceLastOilChange;
+                                  const milesBetween =
+                                    diagnosticsContext.diagnostics[
+                                      vehicles[selectedVehicle].id
+                                    ].milesBetweenOilChanges;
+                                  const remaining =
+                                    milesSince && milesBetween
+                                      ? Math.max(
+                                          0,
+                                          100 -
+                                            Math.round(
+                                              (milesSince / milesBetween) * 100
+                                            )
+                                        )
+                                      : 0;
+                                  return remaining > 25
+                                    ? colors.green[500]
+                                    : remaining > 10
+                                    ? colors.yellow[500]
+                                    : colors.red[500];
+                                })()}
+                              />
+                              <Text
+                                style={[
+                                  styles.progressLabel,
+                                  isDark && styles.textMutedLight,
+                                ]}
+                              >
+                                Oil Life
+                              </Text>
+                            </View>
+                            <View
+                              style={[
+                                styles.progressBarContainer,
+                                isDark && styles.progressBarContainerDark,
+                              ]}
+                            >
+                              {(() => {
+                                const milesSince =
+                                  diagnosticsContext.diagnostics[
+                                    vehicles[selectedVehicle].id
+                                  ].milesSinceLastOilChange;
+                                const milesBetween =
+                                  diagnosticsContext.diagnostics[
+                                    vehicles[selectedVehicle].id
+                                  ].milesBetweenOilChanges;
+                                const vehicle = vehicles[selectedVehicle];
+
+                                // Check if there's no service history data
+                                const hasOilData =
+                                  vehicle.lastOilChange &&
+                                  vehicle.milesAtLastOilChange !== undefined;
+
+                                if (!hasOilData) {
+                                  return (
+                                    <Text
+                                      style={[
+                                        styles.progressBarText,
+                                        isDark && styles.progressBarTextDark,
+                                        { color: colors.gray[500] },
+                                      ]}
+                                    >
+                                      Please enter mileage
+                                    </Text>
+                                  );
+                                }
+
+                                const remaining = Math.max(
+                                  0,
+                                  100 -
+                                    Math.round(
+                                      (milesSince / milesBetween) * 100
+                                    )
+                                );
+                                const barWidth = remaining < 5 ? 3 : remaining;
+                                const barColor =
+                                  remaining > 25
+                                    ? colors.green[500]
+                                    : remaining > 10
+                                    ? colors.yellow[500]
+                                    : colors.red[500];
+                                const textColor =
+                                  remaining < 55
+                                    ? colors.gray[900]
+                                    : isDark
+                                    ? colors.white
+                                    : colors.gray[900];
+
+                                // Show specific messages for low progress
+                                if (remaining <= 0) {
+                                  const milesOverdue = Math.round(
+                                    milesSince - milesBetween
+                                  );
+                                  return (
+                                    <Text
+                                      style={[
+                                        styles.progressBarText,
+                                        isDark && styles.progressBarTextDark,
+                                        {
+                                          color: colors.red[500],
+                                          fontSize: 12,
+                                        },
+                                      ]}
+                                    >
+                                      {milesOverdue} miles overdue
+                                    </Text>
+                                  );
+                                } else if (remaining < 5) {
+                                  const milesUntilDue = Math.round(
+                                    milesBetween - milesSince
+                                  );
+                                  return (
+                                    <Text
+                                      style={[
+                                        styles.progressBarText,
+                                        isDark && styles.progressBarTextDark,
+                                        {
+                                          color: colors.red[500],
+                                          fontSize: 12,
+                                        },
+                                      ]}
+                                    >
+                                      Oil change due in {milesUntilDue} miles
+                                    </Text>
+                                  );
+                                }
+
+                                return (
+                                  <>
+                                    <View
+                                      style={[
+                                        styles.progressBar,
+                                        {
+                                          width: `${barWidth}%`,
+                                          backgroundColor: barColor,
+                                        },
+                                      ]}
+                                    />
+                                    <Text
+                                      style={[
+                                        styles.progressBarText,
+                                        isDark && styles.progressBarTextDark,
+                                        { color: textColor },
+                                      ]}
+                                    >
+                                      {remaining}%
+                                    </Text>
+                                  </>
+                                );
+                              })()}
+                            </View>
+                            {/* Brakes */}
+                            <View style={styles.progressHeader}>
+                              <Feather
+                                name="alert-triangle"
+                                size={16}
+                                color={(() => {
+                                  const vehicle = vehicles[selectedVehicle];
+
+                                  // Check if there's no service history data
+                                  const hasBrakeData =
+                                    vehicle.lastBrakeService &&
+                                    vehicle.milesAtLastBrakeService !==
+                                      undefined;
+
+                                  if (!hasBrakeData) {
+                                    return colors.gray[500];
+                                  }
+
+                                  const milesSince =
+                                    diagnosticsContext.diagnostics[
+                                      vehicles[selectedVehicle].id
+                                    ].milesSinceLastBrakeService;
+                                  const milesBetween =
+                                    diagnosticsContext.diagnostics[
+                                      vehicles[selectedVehicle].id
+                                    ].milesBetweenBrakeChanges;
+                                  const remaining = Math.max(
+                                    0,
+                                    100 -
+                                      Math.round(
+                                        (milesSince / milesBetween) * 100
+                                      )
+                                  );
+                                  return remaining > 25
+                                    ? colors.green[500]
+                                    : remaining > 10
+                                    ? colors.yellow[500]
+                                    : colors.red[500];
+                                })()}
+                              />
+                              <Text
+                                style={[
+                                  styles.progressLabel,
+                                  isDark && styles.textMutedLight,
+                                ]}
+                              >
+                                Brakes
+                              </Text>
+                            </View>
+                            <View
+                              style={[
+                                styles.progressBarContainer,
+                                isDark && styles.progressBarContainerDark,
+                              ]}
+                            >
+                              {(() => {
+                                const milesSince =
+                                  diagnosticsContext.diagnostics[
+                                    vehicles[selectedVehicle].id
+                                  ].milesSinceLastBrakeService;
+                                const milesBetween =
+                                  diagnosticsContext.diagnostics[
+                                    vehicles[selectedVehicle].id
+                                  ].milesBetweenBrakeChanges;
+                                const vehicle = vehicles[selectedVehicle];
+
+                                // Check if there's no service history data
+                                const hasBrakeData =
+                                  vehicle.lastBrakeService &&
+                                  vehicle.milesAtLastBrakeService !== undefined;
+
+                                if (!hasBrakeData) {
+                                  return (
+                                    <Text
+                                      style={[
+                                        styles.progressBarText,
+                                        isDark && styles.progressBarTextDark,
+                                        { color: colors.gray[500] },
+                                      ]}
+                                    >
+                                      Please enter mileage
+                                    </Text>
+                                  );
+                                }
+
+                                const remaining = Math.max(
+                                  0,
+                                  100 -
+                                    Math.round(
+                                      (milesSince / milesBetween) * 100
+                                    )
+                                );
+                                const barWidth = remaining < 5 ? 3 : remaining;
+                                const barColor =
+                                  remaining > 25
+                                    ? colors.green[500]
+                                    : remaining > 10
+                                    ? colors.yellow[500]
+                                    : colors.red[500];
+                                const textColor =
+                                  remaining < 55
+                                    ? colors.gray[900]
+                                    : isDark
+                                    ? colors.white
+                                    : colors.gray[900];
+
+                                // Show specific messages for low progress
+                                if (remaining <= 0) {
+                                  const milesOverdue = Math.round(
+                                    milesSince - milesBetween
+                                  );
+                                  return (
+                                    <Text
+                                      style={[
+                                        styles.progressBarText,
+                                        isDark && styles.progressBarTextDark,
+                                        {
+                                          color: colors.red[500],
+                                          fontSize: 12,
+                                        },
+                                      ]}
+                                    >
+                                      {milesOverdue} miles overdue
+                                    </Text>
+                                  );
+                                } else if (remaining < 5) {
+                                  const milesUntilDue = Math.round(
+                                    milesBetween - milesSince
+                                  );
+                                  return (
+                                    <Text
+                                      style={[
+                                        styles.progressBarText,
+                                        isDark && styles.progressBarTextDark,
+                                        {
+                                          color: colors.red[500],
+                                          fontSize: 12,
+                                        },
+                                      ]}
+                                    >
+                                      Brake service due in {milesUntilDue} miles
+                                    </Text>
+                                  );
+                                }
+
+                                return (
+                                  <>
+                                    <View
+                                      style={[
+                                        styles.progressBar,
+                                        {
+                                          width: `${barWidth}%`,
+                                          backgroundColor: barColor,
+                                        },
+                                      ]}
+                                    />
+                                    <Text
+                                      style={[
+                                        styles.progressBarText,
+                                        isDark && styles.progressBarTextDark,
+                                        { color: textColor },
+                                      ]}
+                                    >
+                                      {remaining}%
+                                    </Text>
+                                  </>
+                                );
+                              })()}
+                            </View>
+                            {/* Tires */}
+                            <View style={styles.progressHeader}>
+                              <Feather
+                                name="circle"
+                                size={16}
+                                color={(() => {
+                                  const vehicle = vehicles[selectedVehicle];
+
+                                  // Check if there's no service history data
+                                  const hasTireData =
+                                    vehicle.lastTireService &&
+                                    vehicle.milesAtLastTireService !==
+                                      undefined;
+
+                                  if (!hasTireData) {
+                                    return colors.gray[500];
+                                  }
+
+                                  const milesSince =
+                                    diagnosticsContext.diagnostics[
+                                      vehicles[selectedVehicle].id
+                                    ].milesSinceLastTireService;
+                                  const milesBetween =
+                                    diagnosticsContext.diagnostics[
+                                      vehicles[selectedVehicle].id
+                                    ].milesBetweenTireService;
+                                  const remaining = Math.max(
+                                    0,
+                                    100 -
+                                      Math.round(
+                                        (milesSince / milesBetween) * 100
+                                      )
+                                  );
+                                  return remaining > 25
+                                    ? colors.green[500]
+                                    : remaining > 10
+                                    ? colors.yellow[500]
+                                    : colors.red[500];
+                                })()}
+                              />
+                              <Text
+                                style={[
+                                  styles.progressLabel,
+                                  isDark && styles.textMutedLight,
+                                ]}
+                              >
+                                Tires
+                              </Text>
+                            </View>
+                            <View
+                              style={[
+                                styles.progressBarContainer,
+                                isDark && styles.progressBarContainerDark,
+                              ]}
+                            >
+                              {(() => {
+                                const milesSince =
+                                  diagnosticsContext.diagnostics[
+                                    vehicles[selectedVehicle].id
+                                  ].milesSinceLastTireService;
+                                const milesBetween =
+                                  diagnosticsContext.diagnostics[
+                                    vehicles[selectedVehicle].id
+                                  ].milesBetweenTireService;
+                                const vehicle = vehicles[selectedVehicle];
+
+                                // Check if there's no service history data
+                                const hasTireData =
+                                  vehicle.lastTireService &&
+                                  vehicle.milesAtLastTireService !== undefined;
+
+                                if (!hasTireData) {
+                                  return (
+                                    <Text
+                                      style={[
+                                        styles.progressBarText,
+                                        isDark && styles.progressBarTextDark,
+                                        { color: colors.gray[500] },
+                                      ]}
+                                    >
+                                      Please enter mileage
+                                    </Text>
+                                  );
+                                }
+
+                                const remaining = Math.max(
+                                  0,
+                                  100 -
+                                    Math.round(
+                                      (milesSince / milesBetween) * 100
+                                    )
+                                );
+                                const barWidth = remaining < 5 ? 3 : remaining;
+                                const barColor =
+                                  remaining > 25
+                                    ? colors.green[500]
+                                    : remaining > 10
+                                    ? colors.yellow[500]
+                                    : colors.red[500];
+                                const textColor =
+                                  remaining < 55
+                                    ? colors.gray[900]
+                                    : isDark
+                                    ? colors.white
+                                    : colors.gray[900];
+
+                                // Show specific messages for low progress
+                                if (remaining <= 0) {
+                                  const milesOverdue = Math.round(
+                                    milesSince - milesBetween
+                                  );
+                                  return (
+                                    <Text
+                                      style={[
+                                        styles.progressBarText,
+                                        isDark && styles.progressBarTextDark,
+                                        {
+                                          color: colors.red[500],
+                                          fontSize: 12,
+                                        },
+                                      ]}
+                                    >
+                                      {milesOverdue} miles overdue
+                                    </Text>
+                                  );
+                                } else if (remaining < 5) {
+                                  const milesUntilDue = Math.round(
+                                    milesBetween - milesSince
+                                  );
+                                  return (
+                                    <Text
+                                      style={[
+                                        styles.progressBarText,
+                                        isDark && styles.progressBarTextDark,
+                                        {
+                                          color: colors.red[500],
+                                          fontSize: 12,
+                                        },
+                                      ]}
+                                    >
+                                      Tire service due in {milesUntilDue} miles
+                                    </Text>
+                                  );
+                                }
+
+                                return (
+                                  <>
+                                    <View
+                                      style={[
+                                        styles.progressBar,
+                                        {
+                                          width: `${barWidth}%`,
+                                          backgroundColor: barColor,
+                                        },
+                                      ]}
+                                    />
+                                    <Text
+                                      style={[
+                                        styles.progressBarText,
+                                        isDark && styles.progressBarTextDark,
+                                        { color: textColor },
+                                      ]}
+                                    >
+                                      {remaining}%
+                                    </Text>
+                                  </>
+                                );
+                              })()}
+                            </View>
+                          </>
+                        ) : (
+                          <Text style={styles.diagnosticText}>
+                            No diagnostics available
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.diagnosticsButtonContainer}>
+                        <Button
+                          title="All Diagnostics"
+                          onPress={() =>
+                            navigation.navigate("FullDiagnostics", {
+                              vehicleId: vehicles[selectedVehicle].id,
+                            })
+                          }
+                          style={styles.viewDetailsButton}
+                          icon={
+                            <Feather
+                              name="arrow-right"
+                              size={16}
+                              color={colors.white}
+                            />
+                          }
+                        />
+                      </View>
+                    </CardContent>
+                  </Card>
+                </View>
+                <View style={styles.serviceInfo}>
+                  <Card style={styles.infoCard}>
+                    <CardHeader style={styles.infoCardHeader}>
+                      <Text
+                        style={[
+                          styles.infoCardTitle,
+                          isDark && styles.textLight,
+                        ]}
+                      >
+                        Service Status
+                      </Text>
+                    </CardHeader>
+                    <CardContent>
+                      <View style={styles.serviceInfo}>
+                        <View style={styles.serviceItem}>
+                          <Text
+                            style={[
+                              styles.serviceLabel,
+                              isDark && styles.textMutedLight,
+                            ]}
+                          >
+                            Last Service
+                          </Text>
+                          <View style={styles.serviceDetail}>
+                            <Feather
+                              name="clock"
+                              size={14}
+                              color={
+                                isDark ? colors.gray[400] : colors.gray[500]
+                              }
+                            />
+                            <Text
+                              style={[
+                                styles.serviceText,
+                                isDark && styles.textLight,
+                              ]}
+                            >
+                              {(() => {
+                                const vehicle = vehicles[selectedVehicle];
+                                const serviceDates = [
+                                  vehicle.lastOilChange,
+                                  vehicle.lastBrakeService,
+                                  vehicle.lastTireService,
+                                ].filter((date) => date && date.trim() !== "");
+
+                                if (serviceDates.length === 0)
+                                  return "No service history";
+
+                                // Find the most recent date
+                                const sortedDates = serviceDates.sort(
+                                  (a, b) =>
+                                    new Date(b).getTime() -
+                                    new Date(a).getTime()
+                                );
+                                return sortedDates[0];
+                              })()}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Button
+                          title="Schedule Service"
+                          onPress={() =>
+                            navigation.navigate("RequestJob" as never)
+                          }
+                          variant="outline"
+                          icon={
+                            <Feather
+                              name="tool"
+                              size={14}
+                              color={
+                                isDark ? colors.white : colors.primary[500]
+                              }
+                            />
+                          }
+                          style={styles.scheduleButton}
+                        />
+                      </View>
+                    </CardContent>
+                  </Card>
+                </View>
 
                 <View style={styles.infoCards}>
                   <Card style={styles.infoCard}>
@@ -596,358 +1367,6 @@ export default function VehicleProfilesScreen() {
                             {vehicles[selectedVehicle]?.engine || "-"}
                           </Text>
                         </View>
-                      </View>
-                    </CardContent>
-                  </Card>
-                </View>
-                <View style={styles.serviceInfo}>
-                  <Card style={styles.infoCard}>
-                    <CardHeader style={styles.infoCardHeader}>
-                      <Text
-                        style={[
-                          styles.infoCardTitle,
-                          isDark && styles.textLight,
-                        ]}
-                      >
-                        Service Status
-                      </Text>
-                    </CardHeader>
-                    <CardContent>
-                      <View style={styles.serviceInfo}>
-                        <View style={styles.serviceItem}>
-                          <Text
-                            style={[
-                              styles.serviceLabel,
-                              isDark && styles.textMutedLight,
-                            ]}
-                          >
-                            Last Service
-                          </Text>
-                          <View style={styles.serviceDetail}>
-                            <Feather
-                              name="clock"
-                              size={14}
-                              color={
-                                isDark ? colors.gray[400] : colors.gray[500]
-                              }
-                            />
-                            <Text
-                              style={[
-                                styles.serviceText,
-                                isDark && styles.textLight,
-                              ]}
-                            >
-                              {vehicles[selectedVehicle].lastService}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.serviceItem}>
-                          <Text
-                            style={[
-                              styles.serviceLabel,
-                              isDark && styles.textMutedLight,
-                            ]}
-                          >
-                            Next Recommended Service
-                          </Text>
-                          <View style={styles.serviceDetail}>
-                            <Feather
-                              name="calendar"
-                              size={14}
-                              color={
-                                isDark ? colors.gray[400] : colors.gray[500]
-                              }
-                            />
-                            <Text
-                              style={[
-                                styles.serviceText,
-                                isDark && styles.textLight,
-                              ]}
-                            >
-                              {vehicles[selectedVehicle].nextService}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <Button
-                          title="Schedule Service"
-                          onPress={() => navigation.navigate("RequestJob", {
-                            vehicleId: vehicles[selectedVehicle].id,
-                          })}
-                          variant="outline"
-                          icon={
-                            <Feather
-                              name="tool"
-                              size={14}
-                              color={
-                                isDark ? colors.white : colors.primary[500]
-                              }
-                            />
-                          }
-                          style={styles.scheduleButton}
-                        />
-                      </View>
-                    </CardContent>
-                  </Card>
-                </View>
-
-                <View>
-                  <Card style={styles.diagnosticsCard}>
-                    <CardHeader style={styles.diagnosticsCardHeader}>
-                      <Text
-                        style={[
-                          styles.diagnosticsTitle,
-                          isDark && styles.textLight,
-                        ]}
-                      >
-                        Diagnostic Summary
-                      </Text>
-                    </CardHeader>
-                    <CardContent>
-                      <View style={styles.diagnosticsGrid}>
-                        {vehicles[selectedVehicle] &&
-                        diagnosticsContext.diagnostics[
-                          vehicles[selectedVehicle].id
-                        ] ? (
-                          <>
-                            {/* Engine */}
-                            <TouchableOpacity
-                              style={[
-                                styles.diagnosticItem,
-                                isDark && styles.diagnosticItemDark,
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.diagnosticLabel,
-                                  isDark && styles.textMutedLight,
-                                ]}
-                              >
-                                Engine
-                              </Text>
-                              <View style={styles.diagnosticValue}>
-                                <Feather
-                                  name="zap"
-                                  size={16}
-                                  color={colors.green[500]}
-                                />
-                                <Text
-                                  style={[
-                                    styles.diagnosticText,
-                                    isDark && styles.textLight,
-                                  ]}
-                                >
-                                  {diagnosticsContext.diagnostics[
-                                    vehicles[selectedVehicle].id
-                                  ].engineRunning
-                                    ? "Running"
-                                    : "Off"}
-                                </Text>
-                                <Feather
-                                  name="chevron-right"
-                                  size={16}
-                                  color={
-                                    isDark ? colors.gray[400] : colors.gray[500]
-                                  }
-                                />
-                              </View>
-                            </TouchableOpacity>
-                            {/* Oil Life */}
-                            <TouchableOpacity
-                              style={[
-                                styles.diagnosticItem,
-                                isDark && styles.diagnosticItemDark,
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.diagnosticLabel,
-                                  isDark && styles.textMutedLight,
-                                ]}
-                              >
-                                Oil Life
-                              </Text>
-                              <View style={styles.diagnosticValue}>
-                                <Feather
-                                  name="droplet"
-                                  size={16}
-                                  color={colors.yellow[500]}
-                                />
-                                <Text
-                                  style={[
-                                    styles.diagnosticText,
-                                    isDark && styles.textLight,
-                                  ]}
-                                >
-                                  {diagnosticsContext.diagnostics[
-                                    vehicles[selectedVehicle].id
-                                  ].milesSinceLastOilChange &&
-                                  diagnosticsContext.diagnostics[
-                                    vehicles[selectedVehicle].id
-                                  ].milesBetweenOilChanges
-                                    ? `${Math.max(
-                                        0,
-                                        100 -
-                                          Math.round(
-                                            (diagnosticsContext.diagnostics[
-                                              vehicles[selectedVehicle].id
-                                            ].milesSinceLastOilChange /
-                                              diagnosticsContext.diagnostics[
-                                                vehicles[selectedVehicle].id
-                                              ].milesBetweenOilChanges) *
-                                              100
-                                          )
-                                      )}%`
-                                    : "-"}
-                                </Text>
-                                <Feather
-                                  name="chevron-right"
-                                  size={16}
-                                  color={
-                                    isDark ? colors.gray[400] : colors.gray[500]
-                                  }
-                                />
-                              </View>
-                            </TouchableOpacity>
-                            {/* Battery */}
-                            <TouchableOpacity
-                              style={[
-                                styles.diagnosticItem,
-                                isDark && styles.diagnosticItemDark,
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.diagnosticLabel,
-                                  isDark && styles.textMutedLight,
-                                ]}
-                              >
-                                Battery
-                              </Text>
-                              <View style={styles.diagnosticValue}>
-                                <Feather
-                                  name="battery"
-                                  size={16}
-                                  color={colors.green[500]}
-                                />
-                                <Text
-                                  style={[
-                                    styles.diagnosticText,
-                                    isDark && styles.textLight,
-                                  ]}
-                                >
-                                  {diagnosticsContext.diagnostics[
-                                    vehicles[selectedVehicle].id
-                                  ].battV
-                                    ? `${
-                                        diagnosticsContext.diagnostics[
-                                          vehicles[selectedVehicle].id
-                                        ].battV
-                                      }V`
-                                    : "-"}
-                                </Text>
-                                <Feather
-                                  name="chevron-right"
-                                  size={16}
-                                  color={
-                                    isDark ? colors.gray[400] : colors.gray[500]
-                                  }
-                                />
-                              </View>
-                            </TouchableOpacity>
-                            {/* Brakes */}
-                            <TouchableOpacity
-                              style={[
-                                styles.diagnosticItem,
-                                isDark && styles.diagnosticItemDark,
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.diagnosticLabel,
-                                  isDark && styles.textMutedLight,
-                                ]}
-                              >
-                                Brakes
-                              </Text>
-                              <View style={styles.diagnosticValue}>
-                                <Feather
-                                  name="alert-triangle"
-                                  size={16}
-                                  color={colors.yellow[500]}
-                                />
-                                <Text
-                                  style={[
-                                    styles.diagnosticText,
-                                    isDark && styles.textLight,
-                                  ]}
-                                >
-                                  {diagnosticsContext.diagnostics[
-                                    vehicles[selectedVehicle].id
-                                  ].milesSinceLastBrakeService &&
-                                  diagnosticsContext.diagnostics[
-                                    vehicles[selectedVehicle].id
-                                  ].milesBetweenBrakeService
-                                    ? `${Math.max(
-                                        0,
-                                        100 -
-                                          Math.round(
-                                            (diagnosticsContext.diagnostics[
-                                              vehicles[selectedVehicle].id
-                                            ].milesSinceLastBrakeService /
-                                              diagnosticsContext.diagnostics[
-                                                vehicles[selectedVehicle].id
-                                              ].milesBetweenBrakeService) *
-                                              100
-                                          )
-                                      )}%`
-                                    : "-"}
-                                </Text>
-                                <Feather
-                                  name="chevron-right"
-                                  size={16}
-                                  color={
-                                    isDark ? colors.gray[400] : colors.gray[500]
-                                  }
-                                />
-                              </View>
-                            </TouchableOpacity>
-                          </>
-                        ) : (
-                          <Text style={styles.diagnosticText}>
-                            No diagnostics available
-                          </Text>
-                        )}
-                      </View>
-                      <View style={styles.diagnosticsButtonContainer}>
-                        <Button
-                          title="View Full Diagnostic"
-                          onPress={() => handleViewJobDetails(navigation)}
-                          style={styles.viewDetailsButton}
-                          icon={
-                            <Feather
-                              name="arrow-right"
-                              size={16}
-                              color={colors.white}
-                            />
-                          }
-                        />
-                        <Button
-                          title="View Live Data"
-                          onPress={() => navigation.navigate("LiveData")}
-                          variant="outline"
-                          style={styles.viewDetailsButton}
-                          icon={
-                            <Feather
-                              name="activity"
-                              size={16}
-                              color={
-                                isDark ? colors.white : colors.primary[500]
-                              }
-                            />
-                          }
-                        />
                       </View>
                     </CardContent>
                   </Card>

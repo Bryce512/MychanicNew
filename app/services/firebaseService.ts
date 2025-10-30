@@ -392,7 +392,7 @@ export const debugFirestoreData = async (userId: string) => {
     try {
       const vehiclesQuery = query(
         collection(db, "vehicles"),
-        where("ownerId", "==", userId)
+        where("ownerId", "array-contains", userId)
       );
       const defaultVehiclesSnap = await getDocs(vehiclesQuery);
       console.log("🔍 Default DB vehicles count:", defaultVehiclesSnap.size);
@@ -412,16 +412,16 @@ export const getVehicles = async (userId: string) => {
   console.log("running getVehicles for user:", userId);
   const db = getFirestore();
   console.log("🚗 Querying vehicles from Firestore...");
-  const q = query(collection(db, "vehicles"), where("ownerId", "==", userId));
+  const q = query(
+    collection(db, "vehicles"),
+    where("ownerId", "array-contains", userId)
+  );
   const vehiclesSnapshot = await getDocs(q);
 
   const vehicles: any[] = [];
   vehiclesSnapshot.forEach((doc: any) => {
     const data = doc.data();
-    // Optionally filter by ownerId here if needed:
-    // if (data.ownerId === userId) {
     vehicles.push({ id: doc.id, ...data });
-    // }
   });
   return vehicles;
 };
@@ -430,7 +430,7 @@ export const addVehicle = async (userId: string, vehicleData: any) => {
   const db = getFirestore();
   const vehicleWithOwner = {
     ...vehicleData,
-    ownerId: userId,
+    ownerId: [userId], // Array to allow multiple owners
   };
   const vehiclesCol = collection(db, "vehicles");
   const docRef = await addDoc(vehiclesCol, vehicleWithOwner);
@@ -451,6 +451,38 @@ export const deleteVehicle = async (userId: string, vehicleId: string) => {
   const vehicleRef = doc(db, "vehicles", vehicleId);
   await deleteDoc(vehicleRef);
   const userRef = doc(db, "users", userId);
+  await updateDoc(userRef, { vehicleIds: arrayRemove(vehicleId) });
+  return true;
+};
+
+// Add an owner to a vehicle (for shared ownership)
+export const addVehicleOwner = async (
+  vehicleId: string,
+  newOwnerId: string
+) => {
+  const db = getFirestore();
+  const vehicleRef = doc(db, "vehicles", vehicleId);
+  await updateDoc(vehicleRef, {
+    ownerId: arrayUnion(newOwnerId),
+  });
+  // Also add the vehicle to the new owner's vehicleIds
+  const userRef = doc(db, "users", newOwnerId);
+  await updateDoc(userRef, { vehicleIds: arrayUnion(vehicleId) });
+  return true;
+};
+
+// Remove an owner from a vehicle (for shared ownership)
+export const removeVehicleOwner = async (
+  vehicleId: string,
+  ownerId: string
+) => {
+  const db = getFirestore();
+  const vehicleRef = doc(db, "vehicles", vehicleId);
+  await updateDoc(vehicleRef, {
+    ownerId: arrayRemove(ownerId),
+  });
+  // Also remove the vehicle from the owner's vehicleIds
+  const userRef = doc(db, "users", ownerId);
   await updateDoc(userRef, { vehicleIds: arrayRemove(vehicleId) });
   return true;
 };
@@ -588,6 +620,8 @@ export default {
   addVehicle,
   updateVehicle,
   deleteVehicle,
+  addVehicleOwner,
+  removeVehicleOwner,
   getDiagnosticLogs,
   ensureUserProfile,
   getUserProfile,

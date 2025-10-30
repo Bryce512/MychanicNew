@@ -77,6 +77,7 @@ import JobsListScreen from "../screens/JobsList";
 import FeedbackScreen from "../screens/Feedback";
 import RequestJobScreen from "../screens/RequestJob";
 import CheckoutScreen from "../screens/Checkout";
+import FullDiagnosticsScreen from "../screens/FullDiagnostics";
 
 export type RootStackParamList = {
   Main: undefined;
@@ -104,6 +105,7 @@ export type RootStackParamList = {
     description: string;
     mechanicName?: string;
   };
+  FullDiagnostics: { vehicleId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -367,6 +369,11 @@ export default function AppNavigator() {
             name="Checkout"
             component={CheckoutScreen}
             options={{ title: "Checkout" }}
+          />
+          <Stack.Screen
+            name="FullDiagnostics"
+            component={FullDiagnosticsScreen}
+            options={{ title: "Full Diagnostics" }}
           />
         </>
       ) : (
