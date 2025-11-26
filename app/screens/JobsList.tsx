@@ -21,7 +21,7 @@ import {
 } from "@react-navigation/native";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { Feather } from "@expo/vector-icons";
-import Card, { CardHeader, CardContent, CardFooter } from "../components/Card";
+import Card, { CardHeader, CardContent } from "../components/Card";
 import { colors } from "../theme/colors";
 import firebaseService from "../services/firebaseService";
 import * as Location from "expo-location";
@@ -108,9 +108,13 @@ export default function JobsListScreen() {
       }
 
       setJobs(jobsData);
-      // Apply filter immediately when jobs are loaded
-      const filtered = await filterJobsByRadius(jobsData, radiusFilter);
-      setFilteredJobs(filtered);
+      // Apply filter immediately when jobs are loaded (only for available jobs)
+      if (isMyJobs) {
+        setFilteredJobs(jobsData); // Show all my jobs without filtering
+      } else {
+        const filtered = await filterJobsByRadius(jobsData, radiusFilter);
+        setFilteredJobs(filtered);
+      }
     } catch (err: any) {
       console.error("Error fetching jobs:", err);
       setError(
@@ -314,13 +318,15 @@ export default function JobsListScreen() {
   }, [radiusFilter]);
 
   useEffect(() => {
-    // Apply radius filter whenever radius or zip code changes
-    const applyFilter = async () => {
-      const filtered = await filterJobsByRadius(jobs, radiusFilter);
-      setFilteredJobs(filtered);
-    };
-    applyFilter();
-  }, [radiusFilter, zipCodeInput, jobs]);
+    // Apply radius filter whenever radius or zip code changes (only for available jobs)
+    if (!isMyJobs) {
+      const applyFilter = async () => {
+        const filtered = await filterJobsByRadius(jobs, radiusFilter);
+        setFilteredJobs(filtered);
+      };
+      applyFilter();
+    }
+  }, [radiusFilter, zipCodeInput, jobs, isMyJobs]);
 
   useEffect(() => {
     // Calculate distances for all jobs when location data changes
@@ -437,21 +443,6 @@ export default function JobsListScreen() {
     }
   };
 
-  const getNextStatusOptions = (
-    currentStatus: Job["status"]
-  ): Job["status"][] => {
-    switch (currentStatus) {
-      case "claimed":
-        return ["in_progress", "completed"];
-      case "in_progress":
-        return ["completed"];
-      case "completed":
-        return []; // No further status changes allowed
-      default:
-        return [];
-    }
-  };
-
   const renderJobCard = (job: Job) => {
     // Get pre-calculated distance
     const distance = jobDistances.get(job.id) || null;
@@ -474,7 +465,7 @@ export default function JobsListScreen() {
               >
                 {job.title || "Vehicle Diagnostic Job"}
               </Text>
-              {distance !== null && (
+              {!isMyJobs && distance !== null && (
                 <View style={styles.detailRow}>
                   <Feather
                     name="navigation"

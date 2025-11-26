@@ -1,5 +1,5 @@
 // Debug: Log all vehicles and their ownerId fields
-import storage from "@react-native-firebase/storage";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { initializeApp, getApp, getApps } from "@react-native-firebase/app";
 import {
   getAuth,
@@ -7,6 +7,11 @@ import {
   createUserWithEmailAndPassword,
   signOut as authSignOut,
   onAuthStateChanged,
+  signInWithCredential,
+  GoogleAuthProvider,
+  PhoneAuthProvider,
+  signInWithPhoneNumber,
+  linkWithCredential,
 } from "@react-native-firebase/auth";
 import {
   getFirestore,
@@ -26,6 +31,7 @@ import {
   getDoc,
 } from "@react-native-firebase/firestore";
 import type { FirebaseAuthTypes } from "@react-native-firebase/auth";
+import storage from "@react-native-firebase/storage";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -159,7 +165,10 @@ export const readData = async (userId: string) => {
 };
 
 // Creates a user profile in the database if it doesn't already exist
-export const ensureUserProfile = async (user: FirebaseAuthTypes.User) => {
+export const ensureUserProfile = async (
+  user: FirebaseAuthTypes.User,
+  role: "user" | "mechanic" = "user"
+) => {
   if (!user) return null;
 
   const db = getFirestore();
@@ -171,6 +180,7 @@ export const ensureUserProfile = async (user: FirebaseAuthTypes.User) => {
         name: user.displayName || "",
         email: user.email || "",
         phone: user.phoneNumber || "",
+        role: role,
       },
       vehicleIds: [],
       createdAt: serverTimestamp(),
@@ -263,7 +273,11 @@ export const signIn = async (email: string, password: string) => {
   }
 };
 
-export const signUp = async (email: string, password: string) => {
+export const signUp = async (
+  email: string,
+  password: string,
+  role: "user" | "mechanic" = "user"
+) => {
   try {
     const auth = getAuth();
     const userCredential = await createUserWithEmailAndPassword(
@@ -278,7 +292,7 @@ export const signUp = async (email: string, password: string) => {
     setTimeout(async () => {
       try {
         console.log("Background: Creating user profile...");
-        await ensureUserProfile(userCredential.user);
+        await ensureUserProfile(userCredential.user, role);
         console.log("Background: User profile created successfully");
       } catch (firestoreError: any) {
         console.warn(
@@ -293,6 +307,115 @@ export const signUp = async (email: string, password: string) => {
   } catch (error) {
     console.error("Firebase signup error:", error);
     return { user: null, error };
+  }
+};
+
+// Phone Authentication
+export const signInWithPhone = async (
+  phoneNumber: string,
+  role?: "user" | "mechanic"
+) => {
+  try {
+    const auth = getAuth();
+    const confirmation = await signInWithPhoneNumber(auth, phoneNumber);
+    return { confirmation, error: null };
+  } catch (error: any) {
+    console.error("Phone sign in error:", error);
+    return { confirmation: null, error };
+  }
+};
+
+export const confirmPhoneCode = async (
+  confirmation: any,
+  verificationCode: string,
+  role: "user" | "mechanic" = "user"
+) => {
+  try {
+    const userCredential = await confirmation.confirm(verificationCode);
+
+    // Create user profile in background (non-blocking)
+    setTimeout(async () => {
+      try {
+        console.log("Background: Creating user profile for phone auth...");
+        await ensureUserProfile(userCredential.user, role);
+        console.log(
+          "Background: User profile created successfully for phone auth"
+        );
+      } catch (firestoreError: any) {
+        console.warn(
+          "Background: Could not create user profile for phone auth:",
+          firestoreError.code
+        );
+      }
+    }, 100);
+
+    return { user: userCredential.user, error: null };
+  } catch (error: any) {
+    console.error("Phone verification error:", error);
+    return { user: null, error };
+  }
+};
+
+// Google Authentication
+export const signInWithGoogle = async (role?: "user" | "mechanic") => {
+  try {
+    // Configure Google Sign-In
+    GoogleSignin.configure({
+      webClientId:
+        "578434461817-994bl7g0rqsqljs8e29cncfulv70ej6c.apps.googleusercontent.com",
+    });
+
+    // Check if device has Google Play Services
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+
+    // Sign in with Google
+    const userInfo = await GoogleSignin.signIn();
+
+    // Create a Google credential with the token
+    const googleCredential = GoogleAuthProvider.credential(
+      userInfo.data?.idToken
+    );
+
+    // Sign in with Firebase
+    const auth = getAuth();
+    const userCredential = await signInWithCredential(auth, googleCredential);
+
+    // Create user profile in background (non-blocking)
+    setTimeout(async () => {
+      try {
+        console.log("Background: Creating user profile for Google auth...");
+        await ensureUserProfile(userCredential.user, role);
+        console.log(
+          "Background: User profile created successfully for Google auth"
+        );
+      } catch (firestoreError: any) {
+        console.warn(
+          "Background: Could not create user profile for Google auth:",
+          firestoreError.code
+        );
+      }
+    }, 100);
+
+    return { user: userCredential.user, error: null };
+  } catch (error: any) {
+    console.error("Google sign in error:", error);
+    let errorMessage = "Failed to sign in with Google";
+    if (error.code === "auth/account-exists-with-different-credential") {
+      errorMessage = "Account exists with different sign-in method";
+    } else if (error.code === "auth/invalid-credential") {
+      errorMessage = "Invalid Google credential";
+    } else if (error.code === "auth/operation-not-allowed") {
+      errorMessage = "Google sign-in is not enabled";
+    }
+
+    return {
+      user: null,
+      error: {
+        code: error.code || "auth/google-signin-error",
+        message: errorMessage,
+        originalError: error,
+      },
+    };
   }
 };
 
@@ -326,6 +449,31 @@ export const getUserProfile = async (userId: string) => {
     }
   } catch (error: any) {
     console.error("📋 getUserProfile error:", {
+      code: error.code,
+      message: error.message,
+      stack: error.stack,
+    });
+    throw error;
+  }
+};
+
+export const updateUserProfile = async (userId: string, profileData: any) => {
+  try {
+    const db = getFirestore();
+    const userRef = doc(db, "users", userId);
+
+    // Update only the profile fields within the profile object
+    await updateDoc(userRef, {
+      profile: {
+        ...profileData,
+      },
+      updatedAt: serverTimestamp(),
+    });
+
+    console.log("User profile updated successfully");
+    return true;
+  } catch (error: any) {
+    console.error("📋 updateUserProfile error:", {
       code: error.code,
       message: error.message,
       stack: error.stack,
@@ -557,6 +705,7 @@ export const getMyJobs = async (mechanicId: string) => {
     id: doc.id,
     ...doc.data(),
   }));
+  console.log(`Fetched ${jobs.length} jobs for mechanic ${mechanicId}`);
   return jobs;
 };
 
@@ -612,6 +761,9 @@ export default {
   writeData,
   signIn,
   signUp,
+  signInWithPhone,
+  confirmPhoneCode,
+  signInWithGoogle,
   signOut,
   getCurrentUser,
   getJob,
@@ -637,4 +789,5 @@ export default {
   releaseJob,
   createJob,
   updateJobStatus,
+  updateUserProfile,
 };

@@ -826,8 +826,8 @@ export const useBleConnection = (options?: {
       );
 
       // Start scanning with no filters and with duplicates allowed
-      await BleManager.scan([], 2, true);
-      logMessage("✅ Scanning started (2 seconds)");
+      await BleManager.scan([], 10, true);
+      logMessage("✅ Scanning started (10 seconds)");
 
       // Get a list of known devices that might be connected already
       try {
@@ -866,9 +866,9 @@ export const useBleConnection = (options?: {
             );
 
             // Update the state with named devices directly from the manager
-            if (namedDevices.length > 0) {
+            if (discoveredFromManager.length > 0) {
               // Map the devices to the expected format
-              const formattedDevices = namedDevices.map((device) => ({
+              const formattedDevices = discoveredFromManager.map((device) => ({
                 id: device.id,
                 name: device.name || null,
                 rssi: device.rssi || -100,
@@ -901,7 +901,7 @@ export const useBleConnection = (options?: {
 
         discoverSub.remove();
         setIsScanning(false);
-      }, 2000); // 2 seconds scan time
+      }, 5000); // 2 seconds scan time
     } catch (err) {
       setIsScanning(false);
       logMessage(
@@ -1271,18 +1271,40 @@ export const useBleConnection = (options?: {
                       .trim();
                     console.log("Full Response (Raw):", responseText);
 
-                    responseText = responseText
-                      .replace(/\r/g, "")
-                      .replace(/\n/g, "")
-                      .replace(">", "");
+                    // Split into lines and remove CR/LF
+                    let lines = responseText
+                      .split(/[\r\n]+/)
+                      .map((line) => line.trim())
+                      .filter((line) => line.length > 0 && line !== ">"); // Remove empty lines and prompt
 
-                    if (responseText.startsWith(command)) {
-                      responseText = responseText
-                        .substring(command.length)
-                        .trim();
+                    console.log("Response Lines:", lines);
+
+                    // The ELM327 echoes the command first, then sends the response
+                    // Skip the echo line and get the actual response
+                    let finalResponse = "";
+
+                    for (let i = 0; i < lines.length; i++) {
+                      const line = lines[i];
+                      // Skip lines that look like the echoed command
+                      if (line.toUpperCase() === command.toUpperCase()) {
+                        console.log("Skipping echo line:", line);
+                        continue;
+                      }
+                      // Skip "OK" responses for setup commands
+                      if (line.toUpperCase() === "OK") {
+                        if (finalResponse.length === 0) {
+                          finalResponse = "OK";
+                        }
+                        continue;
+                      }
+                      // Take the first non-echo line as the response
+                      if (line.length > 0) {
+                        finalResponse = line;
+                        break;
+                      }
                     }
 
-                    console.log("Parsed Response:", responseText);
+                    console.log("Parsed Response:", finalResponse);
                     isCompleted = true;
 
                     if (subscription) {
@@ -1293,7 +1315,7 @@ export const useBleConnection = (options?: {
                       }
                     }
 
-                    resolve(responseText);
+                    resolve(finalResponse);
                   }
                 }
               }

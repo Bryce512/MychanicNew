@@ -1,7 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import type { FirebaseAuthTypes } from "@react-native-firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import firebaseService, { getUserProfile } from "../services/firebaseService";
+import firebaseService, {
+  getUserProfile,
+  signInWithPhone,
+  confirmPhoneCode,
+  signInWithGoogle,
+} from "../services/firebaseService";
 import * as types from "../../types";
 
 type AuthContextType = {
@@ -12,8 +17,21 @@ type AuthContextType = {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (
     email: string,
-    password: string
+    password: string,
+    role?: "user" | "mechanic"
   ) => Promise<{ error: any; user: FirebaseAuthTypes.User | null }>;
+  signInWithPhone: (
+    phoneNumber: string,
+    role?: "user" | "mechanic"
+  ) => Promise<{ confirmation: any; error: any }>;
+  confirmPhoneCode: (
+    confirmation: any,
+    verificationCode: string,
+    role?: "user" | "mechanic"
+  ) => Promise<{ user: FirebaseAuthTypes.User | null; error: any }>;
+  signInWithGoogle: (
+    role?: "user" | "mechanic"
+  ) => Promise<{ user: FirebaseAuthTypes.User | null; error: any }>;
   signOut: () => Promise<void>;
   toggleViewMode: () => void;
 };
@@ -90,10 +108,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    role: "user" | "mechanic" = "user"
+  ) => {
     try {
       // Your existing sign up logic
-      const response = await firebaseService.signUp(email, password);
+      const response = await firebaseService.signUp(email, password, role);
 
       // If signup successful, store user data
       if (response.user && !response.error) {
@@ -122,6 +144,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInWithPhoneAuth = async (
+    phoneNumber: string,
+    role: "user" | "mechanic" = "user"
+  ) => {
+    try {
+      const response = await signInWithPhone(phoneNumber, role);
+      return response;
+    } catch (error) {
+      return { confirmation: null, error };
+    }
+  };
+
+  const confirmPhoneCodeAuth = async (
+    confirmation: any,
+    verificationCode: string,
+    role: "user" | "mechanic" = "user"
+  ) => {
+    try {
+      const response = await confirmPhoneCode(
+        confirmation,
+        verificationCode,
+        role
+      );
+
+      // If phone verification successful, store user data
+      if (response.user && !response.error) {
+        await AsyncStorage.setItem("userData", JSON.stringify(response.user));
+        setUser(response.user);
+        let profile = await getUserProfile(response.user.uid);
+        setProfile(profile || null);
+      }
+
+      return response;
+    } catch (error) {
+      return { user: null, error };
+    }
+  };
+
+  const signInWithGoogleAuth = async (role: "user" | "mechanic" = "user") => {
+    try {
+      const response = await signInWithGoogle(role);
+
+      // If Google sign in successful, store user data
+      if (response.user && !response.error) {
+        await AsyncStorage.setItem("userData", JSON.stringify(response.user));
+        setUser(response.user);
+        let profile = await getUserProfile(response.user.uid);
+        setProfile(profile || null);
+      }
+
+      return response;
+    } catch (error) {
+      return { user: null, error };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -131,6 +209,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         signIn,
         signUp,
+        signInWithPhone: signInWithPhoneAuth,
+        confirmPhoneCode: confirmPhoneCodeAuth,
+        signInWithGoogle: signInWithGoogleAuth,
         signOut,
         toggleViewMode,
       }}

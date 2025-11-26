@@ -82,7 +82,7 @@ import FullDiagnosticsScreen from "../screens/FullDiagnostics";
 export type RootStackParamList = {
   Main: undefined;
   Login: undefined;
-  Signup: undefined;
+  Signup: {role: string};
   BookAppointment: { mechanicId: number };
   JobDetails: { jobId: string };
   DiagnosticAssistant: undefined;
@@ -381,12 +381,16 @@ export default function AppNavigator() {
           <Stack.Screen
             name="Login"
             component={LoginScreen}
-            options={{ title: "Login" }}
+            options={{ title: "Login",
+              headerShown: false
+            }}
           />
           <Stack.Screen
             name="Signup"
             component={SignupScreen}
-            options={{ title: "Sign Up" }}
+            options={{ title: "Sign Up",
+              headerShown: false
+             }}
           />
         </>
       )}

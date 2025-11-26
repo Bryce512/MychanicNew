@@ -36,6 +36,12 @@
           <string>exp+mychanic</string>
         </array>
       </dict>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>com.googleusercontent.apps.578434461817-i6080geine5mmnkneeeolij2huq3lofp</string>
+        </array>
+      </dict>
     </array>
     <key>CFBundleVersion</key>
     <string>1</string>

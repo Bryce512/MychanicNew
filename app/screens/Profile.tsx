@@ -252,6 +252,30 @@ const Profile = () => {
                   : "Switch to Mechanic View"}
               </Text>
             </TouchableOpacity>
+
+            {/* Driver Onboarding Button for Mechanics */}
+            <TouchableOpacity
+              style={{
+                backgroundColor: colors.accent[500],
+                padding: 12,
+                borderRadius: 8,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 12,
+              }}
+              onPress={() => navigation.navigate("DriverOnboarding" as never)}
+            >
+              <Feather
+                name="user-check"
+                size={18}
+                color="white"
+                style={{ marginRight: 8 }}
+              />
+              <Text style={{ color: "white", fontWeight: "bold" }}>
+                Complete Driver Onboarding
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 

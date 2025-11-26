@@ -145,8 +145,8 @@ export const obdDataFunctions = {
     try {
       logMessage("🔄 Fetching engine RPM...");
 
-      // Send RPM command (PID: 0C)
-      const response = await sendCommand(plxDevice, "010C", 2);
+      // Send RPM command (PID: 0C) with AT prefix
+      const response = await sendCommand(plxDevice, "AT RV", 2);
 
       // Parse RPM from response
       if (response) {
@@ -174,7 +174,7 @@ export const obdDataFunctions = {
   },
 
   /**
-   * Get engine RPM (PID 0C)
+   * Get engine RPM (PID 0C) - with AT prefix
    */
   getEngineRPM: async (
     device: Device,
@@ -187,7 +187,8 @@ export const obdDataFunctions = {
   ): Promise<number> => {
     try {
       console.log("Fetching engine RPM...");
-      const rpmResponse = await sendCommand(device, "010C");
+      // Send with AT prefix and spaces
+      const rpmResponse = await sendCommand(device, "AT 010C");
       console.log("Engine RPM Response:", rpmResponse);
 
       // Normalize response to string and split into lines
@@ -216,7 +217,7 @@ export const obdDataFunctions = {
   },
 
   /**
-   * Get coolant temperature (PID 05)
+   * Get coolant temperature (PID 05) - with AT prefix
    */
   getCoolantTemperature: async (
     device: Device,
@@ -229,7 +230,8 @@ export const obdDataFunctions = {
   ): Promise<TemperatureData | null> => {
     try {
       console.log("Fetching coolant temperature...");
-      const response = await sendCommand(device, "0105");
+      // Send with AT prefix and spaces
+      const response = await sendCommand(device, "AT 0105");
       console.log("Coolant Temperature Response:", response);
 
       const responseStr = String(response).replace(/\r/g, "\n");
@@ -258,7 +260,7 @@ export const obdDataFunctions = {
   },
 
   /**
-   * Get intake air temperature (PID 0F)
+   * Get intake air temperature (PID 0F) - with AT prefix
    */
   getIntakeAirTemperature: async (
     device: Device,
@@ -271,7 +273,8 @@ export const obdDataFunctions = {
   ): Promise<TemperatureData | null> => {
     try {
       console.log("Fetching intake air temperature...");
-      const response = await sendCommand(device, "010F");
+      // Send with AT prefix and spaces
+      const response = await sendCommand(device, "AT 01 0F");
       console.log("Intake Air Temperature Response:", response);
 
       const responseStr = String(response).replace(/\r/g, "\n");
@@ -300,7 +303,7 @@ export const obdDataFunctions = {
   },
 
   /**
-   * Get throttle position (PID 11)
+   * Get throttle position (PID 11) - with AT prefix
    */
   getThrottlePosition: async (
     device: Device,
@@ -313,7 +316,8 @@ export const obdDataFunctions = {
   ): Promise<number | null> => {
     try {
       console.log("Fetching throttle position...");
-      const response = await sendCommand(device, "0111");
+      // Send with AT prefix and spaces
+      const response = await sendCommand(device, "AT 0111");
       console.log("Throttle Position Response:", response);
 
       const responseStr = String(response).replace(/\r/g, "\n");
@@ -341,7 +345,7 @@ export const obdDataFunctions = {
   },
 
   /**
-   * Get fuel level (PID 2F)
+   * Get fuel level (PID 2F) - with AT prefix
    */
   getFuelLevel: async (
     device: Device,
@@ -354,7 +358,8 @@ export const obdDataFunctions = {
   ): Promise<number | null> => {
     try {
       console.log("Fetching fuel level...");
-      const response = await sendCommand(device, "012F");
+      // Send with AT prefix and spaces
+      const response = await sendCommand(device, "AT 012F");
       console.log("Fuel Level Response:", response);
 
       const responseStr = String(response).replace(/\r/g, "\n");
@@ -382,7 +387,7 @@ export const obdDataFunctions = {
   },
 
   /**
-   * Get engine load (PID 04)
+   * Get engine load (PID 04) - with AT prefix
    */
   getEngineLoad: async (
     device: Device,
@@ -395,7 +400,8 @@ export const obdDataFunctions = {
   ): Promise<number | null> => {
     try {
       console.log("Fetching engine load...");
-      const response = await sendCommand(device, "0104");
+      // Send with AT prefix and spaces
+      const response = await sendCommand(device, "AT 0104");
       console.log("Engine Load Response:", response);
 
       const responseStr = String(response).replace(/\r/g, "\n");
@@ -462,7 +468,7 @@ export const obdDataFunctions = {
   },
 
   /**
-   * Get vehicle speed (PID 0D)
+   * Get vehicle speed (PID 0D) - with AT prefix
    */
   getVehicleSpeed: async (
     device: Device,
@@ -475,7 +481,7 @@ export const obdDataFunctions = {
   ): Promise<number | null> => {
     try {
       console.log("Fetching vehicle speed...");
-      const response = await sendCommand(device, "010D");
+      const response = await sendCommand(device, "AT 010D");
       console.log("Vehicle Speed Response:", response);
 
       const responseStr = String(response).replace(/\r/g, "\n");
@@ -540,7 +546,7 @@ export const obdDataFunctions = {
   },
 
   /**
-   * Get Diagnostic Trouble Codes (DTC) from vehicle
+   * Get Diagnostic Trouble Codes (DTC) from vehicle - with AT prefix
    */
   getDTCCodes: async (
     plxDevice: Device | null,
@@ -560,8 +566,8 @@ export const obdDataFunctions = {
     try {
       logMessage("🔍 Fetching DTC codes...");
 
-      // Send command to get stored DTC codes
-      const dtcResponse = await sendCommand(plxDevice, "03", 3, 5000);
+      // Send command to get stored DTC codes with AT prefix
+      const dtcResponse = await sendCommand(plxDevice, "AT03", 3, 5000);
       logMessage(`DTC Response: ${dtcResponse}`);
 
       const responseStr = String(dtcResponse).toUpperCase();

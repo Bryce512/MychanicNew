@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import Button from "../components/Button";
 import Card, { CardContent, CardHeader } from "../components/Card";
 import { colors } from "../theme/colors";
 import { vehicleProfileStyles } from "../theme/styles/VehicleProfiles.styles";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const DEFAULT_IMAGE =
   "https://firebasestorage.googleapis.com/v0/b/fluid-tangent-405719.firebasestorage.app/o/public%2Fcar_default.png?alt=media&token=5232adad-a5f7-4b8c-be47-781163a7eaa1";
@@ -29,6 +30,14 @@ import firebaseService from "../services/firebaseService";
 import { useDiagnostics } from "../contexts/VehicleDiagnosticsContext";
 import { obdDataFunctions } from "../services/obdService";
 import { Alert } from "react-native";
+
+const VEHICLES_CACHE_KEY = "@MychanicApp:vehiclesCache";
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+interface CachedVehiclesData {
+  vehicles: any[];
+  timestamp: number;
+}
 
 export default function VehicleProfilesScreen() {
   // All hooks must be called unconditionally and in the same order on every render
@@ -40,29 +49,83 @@ export default function VehicleProfilesScreen() {
   const [selectedVehicle, setSelectedVehicle] = useState(0);
   const [loading, setLoading] = useState(true);
   const bluetoothContext = useBluetooth();
-  // const { getCurrentVoltage, getEngineRPM } = pidCommands();
   const isFocused = useIsFocused();
   const styles = vehicleProfileStyles;
+  const cacheRef = useRef<CachedVehiclesData | null>(null);
+
+  // Check if cache is still valid
+  const isCacheValid = (): boolean => {
+    if (!cacheRef.current) return false;
+    const now = Date.now();
+    return now - cacheRef.current.timestamp < CACHE_DURATION;
+  };
 
   // Fetch vehicles on focus or when Bluetooth connection status/device changes
   useEffect(() => {
-    const fetchVehicles = async () => {
+    const fetchVehicles = async (forceRefresh = false) => {
       try {
         setLoading(true);
         const currentUser = firebaseService.getCurrentUser();
-        if (currentUser) {
-          const userVehicles = await firebaseService.getVehicles(
-            currentUser.uid
-          );
-          setVehicles(userVehicles || []);
-          if (
-            userVehicles?.length > 0 &&
-            selectedVehicle >= userVehicles.length
-          ) {
-            setSelectedVehicle(0);
+
+        if (!currentUser) {
+          setVehicles([]);
+          return;
+        }
+
+        // Check if we have valid cache and not forcing refresh
+        if (!forceRefresh && isCacheValid() && cacheRef.current) {
+          setVehicles(cacheRef.current.vehicles);
+          setLoading(false);
+          return;
+        }
+
+        // Try to load from AsyncStorage first (persistent cache)
+        if (!forceRefresh) {
+          try {
+            const cachedData = await AsyncStorage.getItem(VEHICLES_CACHE_KEY);
+            if (cachedData) {
+              const parsed: CachedVehiclesData = JSON.parse(cachedData);
+              if (isCacheValid()) {
+                cacheRef.current = parsed;
+                setVehicles(parsed.vehicles);
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (cacheError) {
+            console.log("Cache read error (non-critical):", cacheError);
           }
         }
+
+        // Fetch fresh data from Firebase
+        const userVehicles = await firebaseService.getVehicles(currentUser.uid);
+        setVehicles(userVehicles || []);
+
+        // Save to cache
+        const cacheData: CachedVehiclesData = {
+          vehicles: userVehicles || [],
+          timestamp: Date.now(),
+        };
+        cacheRef.current = cacheData;
+
+        try {
+          await AsyncStorage.setItem(
+            VEHICLES_CACHE_KEY,
+            JSON.stringify(cacheData)
+          );
+        } catch (cacheError) {
+          console.log("Cache write error (non-critical):", cacheError);
+        }
+
+        // Reset selected vehicle if out of range
+        if (
+          userVehicles?.length > 0 &&
+          selectedVehicle >= userVehicles.length
+        ) {
+          setSelectedVehicle(0);
+        }
       } catch (error) {
+        console.error("Error fetching vehicles:", error);
         setVehicles([]);
       } finally {
         setLoading(false);
@@ -70,20 +133,25 @@ export default function VehicleProfilesScreen() {
     };
 
     if (isFocused) {
-      fetchVehicles();
+      // Use cached data initially, but check for updates
+      fetchVehicles(false);
     }
+
     // Subscribe to auth changes to reload vehicles when user changes
     const unsubscribe = firebaseService.onAuthChange((user) => {
       if (user) {
-        fetchVehicles();
+        fetchVehicles(true); // Force refresh on auth change
       } else {
         setVehicles([]);
+        cacheRef.current = null;
+        AsyncStorage.removeItem(VEHICLES_CACHE_KEY);
       }
     });
 
     return () => unsubscribe();
-    // Add deviceId and isConnected as dependencies to rerender on Bluetooth changes
-  }, [isFocused, bluetoothContext.deviceId, bluetoothContext.isConnected]);
+    // Note: Don't include deviceId and isConnected in dependencies for vehicle fetching
+    // They're only used for connection status display, not vehicle data
+  }, [isFocused]);
 
   const handleViewJobDetails = (
     navigation: NavigationProp<RootStackParamList>

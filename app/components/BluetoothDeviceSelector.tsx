@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import BleManager from "react-native-ble-manager";
+import { colors } from "../theme/colors";
 
 interface BluetoothDevice {
   id: string;
@@ -100,7 +101,7 @@ const BluetoothDeviceSelector: React.FC<BluetoothDeviceSelectorProps> = ({
 
           {isScanning ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#0066cc" />
+              <ActivityIndicator size="large" color={colors.primary[500]} />
               <Text style={styles.scanningText}>Scanning for devices...</Text>
             </View>
           ) : (
@@ -121,7 +122,7 @@ const BluetoothDeviceSelector: React.FC<BluetoothDeviceSelectorProps> = ({
                         <MaterialCommunityIcons
                           name="bluetooth"
                           size={24}
-                          color="#0066cc"
+                          color={colors.primary[500]}
                         />
                         <View style={styles.deviceTextContainer}>
                           <Text style={styles.deviceName}>
@@ -279,7 +280,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   scanButton: {
-    backgroundColor: "#0066cc",
+    backgroundColor: colors.primary[500],
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -307,7 +308,7 @@ const styles = StyleSheet.create({
   },
   signalBar: {
     width: 3,
-    backgroundColor: "#0066cc",
+    backgroundColor: colors.primary[500],
     marginRight: 2,
     borderRadius: 1,
   },

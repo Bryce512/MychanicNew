@@ -3,12 +3,14 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import firebaseService from "../services/firebaseService";
 import VehicleForm from "../components/VehicleForm";
+import { useDiagnostics } from "../contexts/VehicleDiagnosticsContext";
 
 export default function EditVehicleInfoScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, "EditVehicleInfo">>();
   const { vehicle, userId } = route.params;
   const [loading, setLoading] = useState(false);
+  const diagContext = useDiagnostics();
 
   const handleSave = async (
     vehicleData: any,
@@ -71,6 +73,9 @@ export default function EditVehicleInfoScreen() {
         `users/${currentUser.uid}/vehicles/${vehicle.id}/maintConfigs`
       );
       await db.set(ref, maintConfigData);
+
+      // Refresh diagnostics context after vehicle info is updated
+      await diagContext.refreshDiagnostics();
 
       navigation.goBack();
       return result;
