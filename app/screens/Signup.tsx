@@ -60,15 +60,20 @@ export default function SignupScreen() {
       // First try to sign in
       const { error: signInError } = await signIn(email, password);
 
+      console.log("Sign-in attempt error:", signInError);
+
       if (!signInError) {
         // Successfully signed in existing user
-        Alert.alert("Success", "Welcome back!");
-        navigation.navigate("Home" as never);
+        // Don't navigate - let the auth state change handle it
         return;
       }
 
       // If sign in failed, check if it's because user doesn't exist
-      if (signInError?.code === "auth/user-not-found") {
+      // Check for both "auth/user-not-found" and "auth/invalid-credential" as they can both mean user doesn't exist
+      if (
+        signInError?.code === "auth/user-not-found" ||
+        signInError?.code === "auth/invalid-credential"
+      ) {
         // User doesn't exist, offer to create account
         Alert.alert(
           "Account Not Found",
@@ -91,8 +96,8 @@ export default function SignupScreen() {
                   if (signUpError) {
                     Alert.alert("Error", signUpError.message);
                   } else if (user) {
-                    Alert.alert("Success", "Account created successfully!");
-                    navigation.navigate("Home" as never);
+                    // Don't navigate - let the auth state change handle it
+                    // The AppNavigator will automatically show the Main tabs when user is set
                   }
                 } catch (error) {
                   Alert.alert("Error", "An unexpected error occurred");

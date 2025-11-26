@@ -69,6 +69,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     loadStoredUser();
+
+    // Also listen to Firebase auth state changes
+    const unsubscribe = firebaseService.onAuthChange(async (firebaseUser) => {
+      console.log(
+        "Auth state changed:",
+        firebaseUser ? "logged in" : "logged out"
+      );
+      if (firebaseUser) {
+        // User is logged in
+        setUser(firebaseUser);
+        try {
+          let profile = await getUserProfile(firebaseUser.uid);
+          setProfile(profile || null);
+        } catch (error) {
+          console.error("Error loading profile:", error);
+          setProfile(null);
+        }
+      } else {
+        // User is logged out
+        setUser(null);
+        setProfile(null);
+        setViewMode(null);
+        await AsyncStorage.removeItem("userData");
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // Update viewMode when profile changes

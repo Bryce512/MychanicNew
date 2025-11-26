@@ -250,7 +250,14 @@ export const signIn = async (email: string, password: string) => {
     return { user: userCredential.user, error: null };
   } catch (error: any) {
     let errorMessage = "Failed to sign in";
+    let errorCode = error.code || "auth/unknown";
+
     if (error.code === "auth/user-not-found") {
+      errorMessage = "No account exists with this email";
+    } else if (error.code === "auth/invalid-credential") {
+      // invalid-credential can mean wrong password OR user not found
+      // Treat as user-not-found for new signup flow
+      errorCode = "auth/user-not-found";
       errorMessage = "No account exists with this email";
     } else if (error.code === "auth/wrong-password") {
       errorMessage = "Incorrect password";
@@ -265,7 +272,7 @@ export const signIn = async (email: string, password: string) => {
     return {
       user: null,
       error: {
-        code: error.code || "auth/unknown",
+        code: errorCode,
         message: errorMessage,
         originalError: error,
       },
@@ -422,6 +429,52 @@ export const signInWithGoogle = async (role?: "user" | "mechanic") => {
 export const signOut = async () => {
   const auth = getAuth();
   return authSignOut(auth);
+};
+
+export const deleteAccount = async (userId: string) => {
+  try {
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      throw new Error("No authenticated user found");
+    }
+
+    // Delete user profile from Firestore, but keep vehicles intact
+    const db = getFirestore();
+    const userRef = doc(db, "users", userId);
+
+    // Delete the user profile document
+    await deleteDoc(userRef);
+
+    console.log("User profile deleted from Firestore");
+
+    // Then delete the authentication user
+    await currentUser.delete();
+
+    console.log("User authentication deleted");
+
+    return { success: true, error: null };
+  } catch (error: any) {
+    console.error("Account deletion error:", error);
+    let errorMessage = "Failed to delete account";
+
+    if (error.code === "auth/requires-recent-login") {
+      errorMessage =
+        "Please log out and log back in before deleting your account";
+    } else if (error.code === "auth/user-not-found") {
+      errorMessage = "User account not found";
+    }
+
+    return {
+      success: false,
+      error: {
+        code: error.code || "auth/unknown",
+        message: errorMessage,
+        originalError: error,
+      },
+    };
+  }
 };
 
 export const getCurrentUser = () => {

@@ -84,9 +84,9 @@ export default function LoginScreen() {
           activeOpacity={0.8}
         >
           <View style={styles.overlayContent}>
-            <Text style={styles.overlayTitle}>I'm a Mechanic</Text>
+            <Text style={styles.overlayTitle}>I'm a Mobile Mechanic</Text>
             <Text style={styles.overlaySubtitle}>
-              Join our network of trusted mechanics
+              Join our network of trusted mobile mechanics
             </Text>
           </View>
         </TouchableOpacity>
