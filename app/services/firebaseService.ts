@@ -808,6 +808,10 @@ export const updateJobStatus = async (
   return true;
 };
 
+export const addCarOwner = async  (email: String) => {
+  // TODO
+};
+
 export default {
   initializeFirebase,
   readData,
@@ -843,4 +847,5 @@ export default {
   createJob,
   updateJobStatus,
   updateUserProfile,
+  addCarOwner
 };

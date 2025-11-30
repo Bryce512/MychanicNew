@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { StatusBar } from "react-native";
+import { Share, StatusBar } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
@@ -78,6 +78,7 @@ import FeedbackScreen from "../screens/Feedback";
 import RequestJobScreen from "../screens/RequestJob";
 import CheckoutScreen from "../screens/Checkout";
 import FullDiagnosticsScreen from "../screens/FullDiagnostics";
+import ShareVehicle from "../screens/ShareVehicle";
 
 export type RootStackParamList = {
   Main: undefined;
@@ -106,6 +107,7 @@ export type RootStackParamList = {
     mechanicName?: string;
   };
   FullDiagnostics: { vehicleId: string };
+  ShareVehicle: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -374,6 +376,11 @@ export default function AppNavigator() {
             name="FullDiagnostics"
             component={FullDiagnosticsScreen}
             options={{ title: "Full Diagnostics" }}
+          />
+          <Stack.Screen
+          name = "ShareVehicle"
+          component={ShareVehicle}
+          options={{title: "Share Vehicle"}}
           />
         </>
       ) : (

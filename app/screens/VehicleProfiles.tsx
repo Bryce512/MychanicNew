@@ -654,6 +654,17 @@ export default function VehicleProfilesScreen() {
                     }}
                   />
                 </View>
+                <View>
+                  <Feather
+                    name="share"
+                    size={22}
+                    color={isDark ? colors.white : colors.primary[500]}
+                    style={{ marginRight: 12 }}
+                    onPress={() => {
+                      navigation.navigate("ShareVehicle" as never)
+                    }}
+                  />
+                </View>
               </CardHeader>
 
               <CardContent style={styles.detailsCardContent}>
